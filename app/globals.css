@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background-color: #0b1224;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.card {
+  @apply rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900/80 to-slate-800/60 shadow-card backdrop-blur;
+}
+
+.section-title {
+  @apply text-3xl font-semibold tracking-tight text-slate-50;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full border border-slate-700 bg-slate-800/70 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-100;
+}
+
+.button-primary {
+  @apply inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-primary-dark;
+}
+
+.button-ghost {
+  @apply inline-flex items-center justify-center rounded-full border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-primary hover:text-primary;
+}
