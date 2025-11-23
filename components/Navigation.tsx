@@ -1,31 +1,44 @@
-import Link from "next/link";
+'use client';
 
-const links = [
-  { href: "/jobs", label: "Jobs" },
-  { href: "/resources", label: "Resources" },
-  { href: "/blog", label: "Blog" },
-  { href: "/dashboard/employer", label: "Employer" },
-  { href: "/dashboard/candidate", label: "Candidate" }
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+type NavLink = {
+  href: string; // keep this as a plain string
+  label: string;
+};
+
+const navLinks: NavLink[] = [
+  { href: '/', label: 'Home' },
+  { href: '/jobs', label: 'Jobs' },
+  { href: '/resources', label: 'Resources' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/dashboard/candidate', label: 'Candidate' },
+  { href: '/dashboard/employer', label: 'Employer' },
 ];
 
-export function Navigation() {
+export default function Navigation() {
+  const pathname = usePathname();
+
   return (
-    <nav className="flex items-center gap-4 text-sm font-semibold text-slate-100">
-      {links.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          className="rounded-full px-4 py-2 transition hover:bg-slate-800/60 hover:text-primary"
-        >
-          {link.label}
-        </Link>
-      ))}
-      <Link
-        href="/jobs"
-        className="button-primary hidden sm:inline-flex shadow-lg shadow-primary/30"
-      >
-        View Jobs
-      </Link>
+    <nav className="flex flex-wrap gap-2">
+      {navLinks.map((link) => {
+        const isActive = pathname === link.href;
+
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`rounded-full px-4 py-2 text-sm transition
+              ${isActive
+                ? 'bg-white text-black shadow'
+                : 'text-zinc-300 hover:bg-zinc-800'
+              }`}
+          >
+            {link.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
