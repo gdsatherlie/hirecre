@@ -22,7 +22,9 @@ export function JobCard({ job }: JobCardProps) {
         <p className="text-sm font-medium text-slate-700">{job.company}</p>
         <p className="text-sm text-slate-500">{job.location || 'Location not specified'}</p>
       </div>
-      <p className="line-clamp-3 text-sm text-slate-600">{job.description}</p>
+      <p className="text-sm text-slate-600">
+        {job.description.length > 180 ? `${job.description.slice(0, 180)}...` : job.description}
+      </p>
       <div className="text-sm font-semibold text-primary">View details →</div>
     </Link>
   );
