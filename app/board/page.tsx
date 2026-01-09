@@ -1,370 +1,576 @@
-'use client';
+"use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 
 type Job = {
   id: string;
-  title: string;
-  company: string;
+  source?: string | null;
+  title: string | null;
+  company: string | null;
   location_city?: string | null;
   location_state?: string | null;
   location_raw?: string | null;
   job_type?: string | null;
   employment_type?: string | null;
-  url: string;
+  url: string | null;
   posted_at?: string | null;
-  created_at?: string | null;
-  source?: string | null;
   description?: string | null;
+
+  // Optional columns that may or may not exist in your DB:
+  pay?: string | null;
+  salary?: string | null;
+  compensation?: string | null;
 };
 
-const PAGE_SIZE = 25;
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-const STATE_TO_ABBR: Record<string, string> = {
-  Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA', Colorado: 'CO', Connecticut: 'CT',
-  Delaware: 'DE', 'District of Columbia': 'DC', Florida: 'FL', Georgia: 'GA', Hawaii: 'HI', Idaho: 'ID',
-  Illinois: 'IL', Indiana: 'IN', Iowa: 'IA', Kansas: 'KS', Kentucky: 'KY', Louisiana: 'LA', Maine: 'ME',
-  Maryland: 'MD', Massachusetts: 'MA', Michigan: 'MI', Minnesota: 'MN', Mississippi: 'MS', Missouri: 'MO',
-  Montana: 'MT', Nebraska: 'NE', Nevada: 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM',
-  'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', Ohio: 'OH', Oklahoma: 'OK', Oregon: 'OR',
-  Pennsylvania: 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', Tennessee: 'TN',
-  Texas: 'TX', Utah: 'UT', Vermont: 'VT', Virginia: 'VA', Washington: 'WA', 'West Virginia': 'WV',
-  Wisconsin: 'WI', Wyoming: 'WY',
-};
-
-function normalizeSpace(s: string) {
-  return s.replace(/\s+/g, ' ').trim();
-}
-
-function stripHtml(html: string) {
-  return normalizeSpace(html.replace(/<[^>]*>/g, ' '));
-}
-
+// If you want to hard-fix some “slugs” into display names:
 const COMPANY_OVERRIDES: Record<string, string> = {
-  bgeinc: 'BGE, Inc.',
-  homelight: 'HomeLight',
-  figure: 'FIGURE',
-  extenteam: 'ExtenTeam',
+  bgeinc: "BGE, Inc.",
+  homelight: "HomeLight",
+  // add more overrides here as you notice them
 };
 
-function formatCompany(raw: string) {
-  const key = normalizeSpace(raw).toLowerCase().replace(/[^a-z0-9]/g, '');
+// US state full name -> abbreviation
+const US_STATES: Record<string, string> = {
+  ALABAMA: "AL",
+  ALASKA: "AK",
+  ARIZONA: "AZ",
+  ARKANSAS: "AR",
+  CALIFORNIA: "CA",
+  COLORADO: "CO",
+  CONNECTICUT: "CT",
+  DELAWARE: "DE",
+  FLORIDA: "FL",
+  GEORGIA: "GA",
+  HAWAII: "HI",
+  IDAHO: "ID",
+  ILLINOIS: "IL",
+  INDIANA: "IN",
+  IOWA: "IA",
+  KANSAS: "KS",
+  KENTUCKY: "KY",
+  LOUISIANA: "LA",
+  MAINE: "ME",
+  MARYLAND: "MD",
+  MASSACHUSETTS: "MA",
+  MICHIGAN: "MI",
+  MINNESOTA: "MN",
+  MISSISSIPPI: "MS",
+  MISSOURI: "MO",
+  MONTANA: "MT",
+  NEBRASKA: "NE",
+  NEVADA: "NV",
+  "NEW HAMPSHIRE": "NH",
+  "NEW JERSEY": "NJ",
+  "NEW MEXICO": "NM",
+  "NEW YORK": "NY",
+  "NORTH CAROLINA": "NC",
+  "NORTH DAKOTA": "ND",
+  OHIO: "OH",
+  OKLAHOMA: "OK",
+  OREGON: "OR",
+  PENNSYLVANIA: "PA",
+  "RHODE ISLAND": "RI",
+  "SOUTH CAROLINA": "SC",
+  "SOUTH DAKOTA": "SD",
+  TENNESSEE: "TN",
+  TEXAS: "TX",
+  UTAH: "UT",
+  VERMONT: "VT",
+  VIRGINIA: "VA",
+  WASHINGTON: "WA",
+  "WEST VIRGINIA": "WV",
+  WISCONSIN: "WI",
+  WYOMING: "WY",
+  "DISTRICT OF COLUMBIA": "DC",
+};
+
+function titleCaseCompany(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+
+  const key = trimmed.toLowerCase().replace(/\s+/g, "");
   if (COMPANY_OVERRIDES[key]) return COMPANY_OVERRIDES[key];
 
-  const cleaned = normalizeSpace(raw).replace(/[_-]+/g, ' ');
-  const words = cleaned.split(' ').filter(Boolean).map((w) => {
-    const up = w.toUpperCase();
-    if (['LLC', 'LP', 'LLP', 'INC', 'REIT'].includes(up)) return up;
-    if (w === up && w.length <= 5) return up; // acronyms like JLL
-    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-  });
+  // If the input already contains clear capitalization (e.g. "CBRE", "JLL"), keep it
+  const hasUpper = /[A-Z]/.test(trimmed);
+  const hasLower = /[a-z]/.test(trimmed);
+  if (hasUpper && hasLower) return trimmed;
 
-  return words.join(' ');
+  const acronyms = new Set(["LLC", "LP", "LLP", "REIT", "CRE", "USA", "US", "IT"]);
+  return trimmed
+    .toLowerCase()
+    .split(/[\s/.-]+/)
+    .map((w) => {
+      if (!w) return w;
+      const up = w.toUpperCase();
+      if (acronyms.has(up)) return up;
+      if (w.length <= 2) return up; // "AI", "RE"
+      return w[0].toUpperCase() + w.slice(1);
+    })
+    .join(" ");
 }
 
-function normalizeStateToAbbr(state: string | null | undefined): string | null {
-  if (!state) return null;
-  const s = normalizeSpace(state);
-  if (/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase();
-  if (STATE_TO_ABBR[s]) return STATE_TO_ABBR[s];
-  const match = Object.keys(STATE_TO_ABBR).find((k) => k.toLowerCase() === s.toLowerCase());
-  if (match) return STATE_TO_ABBR[match];
+function normalizeState(input?: string | null): string {
+  if (!input) return "";
+  const s = input.trim();
+  if (!s) return "";
+  if (s.length === 2) return s.toUpperCase();
+
+  const key = s.toUpperCase();
+  if (US_STATES[key]) return US_STATES[key];
+
+  // Sometimes state comes in like "Florida 33410" or "California, United States"
+  const first = key.split(",")[0]?.trim() ?? key;
+  if (US_STATES[first]) return US_STATES[first];
+
+  // If we can't map it, keep original (better than blank)
   return s;
 }
 
-function isRemote(job: Job) {
-  const raw = (job.location_raw || '').toLowerCase();
-  const city = (job.location_city || '').toLowerCase();
-  const state = (job.location_state || '').toLowerCase();
-  return raw.includes('remote') || city.includes('remote') || state.includes('remote');
-}
-
-function fmtLocation(job: Job) {
-  if (isRemote(job)) return 'Remote';
-  const city = job.location_city ? normalizeSpace(job.location_city) : '';
-  const st = normalizeStateToAbbr(job.location_state);
-  if (city && st) return `${city}, ${st}`;
-  if (job.location_raw) return normalizeSpace(job.location_raw);
-  return '—';
-}
-
-function fmtDate(d: string | null | undefined) {
-  if (!d) return '';
+function fmtDate(d?: string | null) {
+  if (!d) return "";
   try {
-    return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(d).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   } catch {
-    return '';
+    return "";
   }
 }
 
-// Extract pay guidance from description (no DB column required)
+function isRemote(job: Job): boolean {
+  const hay = `${job.location_raw ?? ""} ${job.location_city ?? ""} ${job.location_state ?? ""}`.toLowerCase();
+  return hay.includes("remote");
+}
+
+function fmtLocation(job: Job): string {
+  const city = (job.location_city ?? "").trim();
+  const state = normalizeState(job.location_state);
+  const raw = (job.location_raw ?? "").trim();
+
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+  if (raw) return raw;
+  return "—";
+}
+
 function extractPay(job: Job): string | null {
-  const text = job.description ? stripHtml(job.description) : '';
-  if (!text) return null;
+  const direct =
+    (job.pay ?? "").trim() ||
+    (job.salary ?? "").trim() ||
+    (job.compensation ?? "").trim();
 
-  const payLabel = text.match(/(?:Pay|Salary|Compensation)\s*:\s*([^\n\r]{3,80})/i);
-  if (payLabel?.[1]) return normalizeSpace(payLabel[1]).slice(0, 80);
+  if (direct) return direct;
 
-  const range = text.match(/\$\s?\d{2,3}(?:,\d{3})+(?:\s?(?:–|-)\s?\$\s?\d{2,3}(?:,\d{3})+)?(?:\s?\/\s?(?:yr|year|hr|hour))?/i);
-  if (range?.[0]) return normalizeSpace(range[0]).slice(0, 80);
+  // Try to find pay inside description/location text
+  const text = `${job.description ?? ""}\n${job.location_raw ?? ""}`;
+  const m =
+    text.match(/\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i) ||
+    text.match(/\$\s?\d{2,3}(?:,\d{3})+(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)/i) ||
+    text.match(/\$\s?\d+(?:,\d{3})*\s?(?:\/hour|\/hr|per hour|hr)/i);
 
-  return null;
+  return m ? m[0].replace(/\s+/g, " ").trim() : null;
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700">
+      {children}
+    </span>
+  );
 }
 
 export default function BoardPage() {
   const router = useRouter();
 
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [count, setCount] = useState<number>(0);
 
-  const [q, setQ] = useState('');
-  const [company, setCompany] = useState('ALL');
-  const [stateAbbr, setStateAbbr] = useState('ALL');
-  const [category, setCategory] = useState('ALL');
-  const [source, setSource] = useState('ALL');
-  const [remoteOnly, setRemoteOnly] = useState(false);
+  // Facets
+  const [companyOptions, setCompanyOptions] = useState<string[]>([]);
+  const [stateOptions, setStateOptions] = useState<string[]>([]);
+  const [sourceOptions, setSourceOptions] = useState<string[]>([]);
 
-  const [page, setPage] = useState(1);
+  // Filters
+  const [q, setQ] = useState("");
+  const [company, setCompany] = useState<string>("ALL");
+  const [state, setState] = useState<string>("ALL");
+  const [source, setSource] = useState<string>("ALL");
+  const [remoteOnly, setRemoteOnly] = useState<boolean>(false);
 
+  // Paging
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState<number>(1);
+
+  // ----- Auth gate -----
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !anon) {
-      setError('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in Coolify env vars.');
-      setLoading(false);
-      return;
-    }
-
-    const supabase = createClient(url, anon);
-
     (async () => {
-      setLoading(true);
-      setError(null);
+      const { data } = await supabase.auth.getSession();
+      const email = data.session?.user?.email ?? null;
+
+      if (!email) {
+        router.push("/login");
+        return;
+      }
+      setUserEmail(email);
+    })();
+  }, [router]);
+
+  // ----- Load facet options once -----
+  useEffect(() => {
+    (async () => {
       try {
-        // IMPORTANT: only select columns we know exist (no "pay" column)
-        const { data, error: qErr } = await supabase
-          .from('jobs')
-          .select('id,title,company,location_city,location_state,location_raw,job_type,employment_type,url,posted_at,created_at,source,description')
-          .order('posted_at', { ascending: false })
-          .range(0, 4999);
+        const { data, error } = await supabase
+          .from("jobs")
+          .select("company, location_state, source")
+          .limit(5000);
 
-        if (qErr) throw qErr;
+        if (error) throw error;
+        const rows = (data ?? []) as Pick<Job, "company" | "location_state" | "source">[];
 
-        setJobs((data || []) as Job[]);
-      } catch (e: any) {
-        setError(e?.message || 'Failed to load jobs');
-      } finally {
-        setLoading(false);
+        const companies = new Set<string>();
+        const states = new Set<string>();
+        const sources = new Set<string>();
+
+        for (const r of rows) {
+          if (r.company) companies.add(titleCaseCompany(r.company));
+          const st = normalizeState(r.location_state);
+          if (st) states.add(st);
+          if (r.source) sources.add(String(r.source).toLowerCase());
+        }
+
+        setCompanyOptions(Array.from(companies).sort((a, b) => a.localeCompare(b)));
+        setStateOptions(Array.from(states).sort((a, b) => a.localeCompare(b)));
+        setSourceOptions(Array.from(sources).sort((a, b) => a.localeCompare(b)));
+      } catch {
+        // If this fails, the board still works; options may just be empty.
       }
     })();
   }, []);
 
-  const companyOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const j of jobs) if (j.company) set.add(formatCompany(j.company));
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [jobs]);
-
-  const stateOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const j of jobs) {
-      const ab = normalizeStateToAbbr(j.location_state);
-      if (ab && /^[A-Z]{2}$/.test(ab)) set.add(ab);
-    }
-    return Array.from(set).sort();
-  }, [jobs]);
-
-  const categoryOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const j of jobs) if (j.job_type) set.add(normalizeSpace(j.job_type));
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [jobs]);
-
-  const sourceOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const j of jobs) if (j.source) set.add(normalizeSpace(j.source));
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [jobs]);
-
-  const filtered = useMemo(() => {
-    const query = normalizeSpace(q).toLowerCase();
-
-    const matchesText = (j: Job) => {
-      if (!query) return true;
-      const hay = [
-        j.title,
-        j.company ? formatCompany(j.company) : '',
-        j.location_city || '',
-        normalizeStateToAbbr(j.location_state) || '',
-        j.location_raw || '',
-        j.job_type || '',
-      ]
-        .join(' ')
-        .toLowerCase();
-      return hay.includes(query);
-    };
-
-    const matchesCompany = (j: Job) => company === 'ALL' || formatCompany(j.company || '') === company;
-    const matchesState = (j: Job) => stateAbbr === 'ALL' || normalizeStateToAbbr(j.location_state) === stateAbbr;
-    const matchesCategory = (j: Job) => category === 'ALL' || normalizeSpace(j.job_type || '') === category;
-    const matchesSource = (j: Job) => source === 'ALL' || normalizeSpace(j.source || '') === source;
-    const matchesRemote = (j: Job) => !remoteOnly || isRemote(j);
-
-    return jobs.filter((j) => matchesText(j) && matchesCompany(j) && matchesState(j) && matchesCategory(j) && matchesSource(j) && matchesRemote(j));
-  }, [jobs, q, company, stateAbbr, category, source, remoteOnly]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-
+  // Reset to page 1 whenever filters change
   useEffect(() => {
     setPage(1);
-  }, [q, company, stateAbbr, category, source, remoteOnly]);
+  }, [q, company, state, source, remoteOnly]);
 
-  const pageJobs = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, safePage]);
+  // ----- Fetch jobs -----
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+
+      try {
+        let query = supabase
+          .from("jobs")
+          .select("*", { count: "exact" })
+          .order("posted_at", { ascending: false });
+
+        const qq = q.trim();
+        if (qq) {
+          const esc = qq.replace(/,/g, "\\,");
+          query = query.or(
+            [
+              `title.ilike.%${esc}%`,
+              `company.ilike.%${esc}%`,
+              `location_raw.ilike.%${esc}%`,
+              `location_city.ilike.%${esc}%`,
+              `location_state.ilike.%${esc}%`,
+              `job_type.ilike.%${esc}%`,
+            ].join(",")
+          );
+        }
+
+        if (company !== "ALL") {
+          // We store raw company in DB; do a looser match
+          query = query.ilike("company", `%${company}%`);
+        }
+
+        if (state !== "ALL") {
+          // Try match either abbreviation or full name if present in raw
+          query = query.or(
+            [
+              `location_state.ilike.%${state}%`,
+              `location_raw.ilike.%${state}%`,
+            ].join(",")
+          );
+        }
+
+        if (source !== "ALL") {
+          query = query.eq("source", source);
+        }
+
+        if (remoteOnly) {
+          query = query.or(
+            [
+              "location_raw.ilike.%remote%",
+              "location_city.ilike.%remote%",
+              "location_state.ilike.%remote%",
+            ].join(",")
+          );
+        }
+
+        const from = (page - 1) * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        const { data, error, count: c } = await query.range(from, to);
+
+        if (error) throw error;
+
+        setJobs((data ?? []) as Job[]);
+        setCount(c ?? 0);
+      } catch (e) {
+        setJobs([]);
+        setCount(0);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [q, company, state, source, remoteOnly, page]);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   return (
-    <div className="hc-page">
-      <header className="hc-header">
-        <div className="hc-header-inner">
-          <Link href="/" className="hc-logo">
-            HireCRE
-          </Link>
-          <nav className="hc-nav">
-            <Link href="/" className="hc-navlink">Home</Link>
-            <Link href="/board" className="hc-navlink hc-navlink-active">Jobs</Link>
-            <Link href="/login" className="hc-navlink">Login</Link>
-          </nav>
+    <div className="min-h-[calc(100vh-120px)] bg-gray-50">
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Jobs</h1>
+            <div className="mt-1 text-sm text-gray-600">
+              Signed in as <span className="font-medium">{userEmail ?? "…"}</span>
+              <button
+                onClick={signOut}
+                className="ml-3 text-sm font-semibold text-blue-700 hover:underline"
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+
+          <div className="text-sm text-gray-600">
+            <span className="font-semibold text-gray-900">{count.toLocaleString()}</span> jobs
+          </div>
         </div>
-      </header>
 
-      <main className="hc-main">
-        <section className="hc-hero">
-          <h1>Commercial real estate jobs</h1>
-          <p>Search across curated sources. Clean filters. Fast scanning.</p>
-
-          <div className="hc-filters">
-            <div className="hc-filter">
-              <label>What</label>
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company, location…" className="hc-input" />
+        {/* Filters */}
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-12">
+            <div className="md:col-span-5">
+              <label className="mb-1 block text-xs font-semibold text-gray-700">Search</label>
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search title, company, location…"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+              />
             </div>
 
-            <div className="hc-filter">
-              <label>Company</label>
-              <select value={company} onChange={(e) => setCompany(e.target.value)} className="hc-select">
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-xs font-semibold text-gray-700">Company</label>
+              <select
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+              >
                 <option value="ALL">All companies</option>
-                {companyOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+                {companyOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div className="hc-filter">
-              <label>State</label>
-              <select value={stateAbbr} onChange={(e) => setStateAbbr(e.target.value)} className="hc-select">
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-gray-700">State</label>
+              <select
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+              >
                 <option value="ALL">All states</option>
-                {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                {stateOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div className="hc-filter">
-              <label>Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className="hc-select">
-                <option value="ALL">All categories</option>
-                {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            <div className="hc-filter">
-              <label>Source</label>
-              <select value={source} onChange={(e) => setSource(e.target.value)} className="hc-select">
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-gray-700">Source</label>
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
+              >
                 <option value="ALL">All sources</option>
-                {sourceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                {sourceOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div className="hc-filter hc-filter-remote">
-              <label>&nbsp;</label>
-              <label className="hc-check">
-                <input type="checkbox" checked={remoteOnly} onChange={(e) => setRemoteOnly(e.target.checked)} />
+            <div className="md:col-span-12 flex items-center gap-4 pt-1">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={remoteOnly}
+                  onChange={(e) => setRemoteOnly(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
                 Remote only
               </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setQ("");
+                  setCompany("ALL");
+                  setState("ALL");
+                  setSource("ALL");
+                  setRemoteOnly(false);
+                }}
+                className="text-sm font-semibold text-gray-700 hover:underline"
+              >
+                Clear filters
+              </button>
             </div>
           </div>
-
-          <div className="hc-stats">
-            {loading ? (
-              <span>Loading…</span>
-            ) : error ? (
-              <span className="hc-error">Error loading jobs: {error}</span>
-            ) : (
-              <span>
-                Showing <strong>{filtered.length.toLocaleString()}</strong> jobs
-              </span>
-            )}
-          </div>
-        </section>
-
-        <section className="hc-results">
-          {pageJobs.map((j) => {
-            const pay = extractPay(j);
-            return (
-              <article key={j.id} className="hc-card">
-                <div className="hc-card-top">
-                  <div className="hc-card-title">
-                    <a href={j.url} target="_blank" rel="noreferrer" className="hc-titlelink">
-                      {j.title}
-                    </a>
-                    <div className="hc-company">{formatCompany(j.company)}</div>
-                  </div>
-
-                  <div className="hc-badges">
-                    {pay ? <span className="hc-badge hc-badge-pay">{pay}</span> : null}
-                    {isRemote(j) ? <span className="hc-badge">Remote</span> : null}
-                    {j.source ? <span className="hc-badge">{normalizeSpace(j.source)}</span> : null}
-                  </div>
-                </div>
-
-                <div className="hc-meta">
-                  <span>{fmtLocation(j)}</span>
-                  {j.job_type ? <span>• {normalizeSpace(j.job_type)}</span> : null}
-                  {(j.posted_at || j.created_at) ? <span>• Posted {fmtDate(j.posted_at || j.created_at)}</span> : null}
-                </div>
-
-                <div className="hc-card-actions">
-                  <a className="hc-btn" href={j.url} target="_blank" rel="noreferrer">View job</a>
-                </div>
-              </article>
-            );
-          })}
-
-          {!loading && !error && filtered.length === 0 ? (
-            <div className="hc-empty">No jobs match these filters.</div>
-          ) : null}
-
-          {!loading && !error && filtered.length > 0 ? (
-            <div className="hc-pagination">
-              <button className="hc-pagebtn" onClick={() => setPage(1)} disabled={safePage === 1}>« First</button>
-              <button className="hc-pagebtn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}>‹ Prev</button>
-              <span className="hc-pages">Page <strong>{safePage}</strong> of <strong>{pageCount}</strong></span>
-              <button className="hc-pagebtn" onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={safePage === pageCount}>Next ›</button>
-              <button className="hc-pagebtn" onClick={() => setPage(pageCount)} disabled={safePage === pageCount}>Last »</button>
-            </div>
-          ) : null}
-        </section>
-      </main>
-
-      <footer className="hc-footer">
-        <div className="hc-footer-inner">
-          <span>HireCRE • Job board MVP</span>
-          <span className="hc-muted">Sources: Greenhouse (for now)</span>
         </div>
-      </footer>
+
+        {/* Results */}
+        <div className="mt-6">
+          {loading ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
+              Loading…
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
+              No jobs match your filters.
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {jobs.map((job) => {
+                const companyName = titleCaseCompany(job.company ?? "");
+                const location = fmtLocation(job);
+                const posted = fmtDate(job.posted_at);
+                const remote = isRemote(job);
+                const pay = extractPay(job);
+                const sourceLabel = (job.source ?? "unknown").toLowerCase();
+
+                return (
+                  <div
+                    key={job.id}
+                    className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-lg font-semibold text-gray-900">
+                          {job.url ? (
+                            <a
+                              href={job.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="hover:underline"
+                            >
+                              {job.title ?? "Untitled role"}
+                            </a>
+                          ) : (
+                            job.title ?? "Untitled role"
+                          )}
+                        </div>
+
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <div className="text-base font-semibold text-gray-900">
+                            {companyName || "—"}
+                          </div>
+                          <span className="text-gray-300">•</span>
+                          <div className="text-sm text-gray-700">{location}</div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {remote && <Pill>Remote</Pill>}
+                          {job.job_type && <Pill>{job.job_type}</Pill>}
+                          {job.employment_type && <Pill>{job.employment_type}</Pill>}
+                          <Pill>{sourceLabel}</Pill>
+                          {pay && <Pill>Pay: {pay}</Pill>}
+                        </div>
+
+                        <div className="mt-3 text-xs text-gray-500">
+                          {posted ? `Posted ${posted}` : ""}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        {job.url && (
+                          <a
+                            href={job.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                          >
+                            View job
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination */}
+        <div className="mt-6 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page <span className="font-semibold text-gray-900">{page}</span> of{" "}
+            <span className="font-semibold text-gray-900">{totalPages}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-10 text-xs text-gray-500">
+          Tip: If the board ever shows “no jobs” unexpectedly, it’s usually auth/RLS. Log out and
+          log back in, or confirm your `jobs_read_authenticated` policy is still enabled.
+        </div>
+      </div>
     </div>
   );
 }
