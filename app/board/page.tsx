@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
 type Job = {
@@ -18,64 +19,20 @@ type Job = {
   created_at?: string | null;
   source?: string | null;
   description?: string | null;
-  pay?: string | null; // optional if you later add a DB column
 };
 
 const PAGE_SIZE = 25;
 
-// ---- State name -> abbreviation (includes DC) ----
 const STATE_TO_ABBR: Record<string, string> = {
-  Alabama: 'AL',
-  Alaska: 'AK',
-  Arizona: 'AZ',
-  Arkansas: 'AR',
-  California: 'CA',
-  Colorado: 'CO',
-  Connecticut: 'CT',
-  Delaware: 'DE',
-  'District of Columbia': 'DC',
-  Florida: 'FL',
-  Georgia: 'GA',
-  Hawaii: 'HI',
-  Idaho: 'ID',
-  Illinois: 'IL',
-  Indiana: 'IN',
-  Iowa: 'IA',
-  Kansas: 'KS',
-  Kentucky: 'KY',
-  Louisiana: 'LA',
-  Maine: 'ME',
-  Maryland: 'MD',
-  Massachusetts: 'MA',
-  Michigan: 'MI',
-  Minnesota: 'MN',
-  Mississippi: 'MS',
-  Missouri: 'MO',
-  Montana: 'MT',
-  Nebraska: 'NE',
-  Nevada: 'NV',
-  'New Hampshire': 'NH',
-  'New Jersey': 'NJ',
-  'New Mexico': 'NM',
-  'New York': 'NY',
-  'North Carolina': 'NC',
-  'North Dakota': 'ND',
-  Ohio: 'OH',
-  Oklahoma: 'OK',
-  Oregon: 'OR',
-  Pennsylvania: 'PA',
-  'Rhode Island': 'RI',
-  'South Carolina': 'SC',
-  'South Dakota': 'SD',
-  Tennessee: 'TN',
-  Texas: 'TX',
-  Utah: 'UT',
-  Vermont: 'VT',
-  Virginia: 'VA',
-  Washington: 'WA',
-  'West Virginia': 'WV',
-  Wisconsin: 'WI',
-  Wyoming: 'WY',
+  Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA', Colorado: 'CO', Connecticut: 'CT',
+  Delaware: 'DE', 'District of Columbia': 'DC', Florida: 'FL', Georgia: 'GA', Hawaii: 'HI', Idaho: 'ID',
+  Illinois: 'IL', Indiana: 'IN', Iowa: 'IA', Kansas: 'KS', Kentucky: 'KY', Louisiana: 'LA', Maine: 'ME',
+  Maryland: 'MD', Massachusetts: 'MA', Michigan: 'MI', Minnesota: 'MN', Mississippi: 'MS', Missouri: 'MO',
+  Montana: 'MT', Nebraska: 'NE', Nevada: 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM',
+  'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', Ohio: 'OH', Oklahoma: 'OK', Oregon: 'OR',
+  Pennsylvania: 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD', Tennessee: 'TN',
+  Texas: 'TX', Utah: 'UT', Vermont: 'VT', Virginia: 'VA', Washington: 'WA', 'West Virginia': 'WV',
+  Wisconsin: 'WI', Wyoming: 'WY',
 };
 
 function normalizeSpace(s: string) {
@@ -86,48 +43,24 @@ function stripHtml(html: string) {
   return normalizeSpace(html.replace(/<[^>]*>/g, ' '));
 }
 
-function toTitleCase(input: string) {
-  const s = normalizeSpace(input.toLowerCase());
-  // Keep common small words lower unless first
-  const small = new Set(['and', 'or', 'the', 'of', 'to', 'in', 'at', 'for', 'a', 'an']);
-  return s
-    .split(' ')
-    .map((w, i) => {
-      if (!w) return w;
-      if (i !== 0 && small.has(w)) return w;
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    })
-    .join(' ');
-}
-
 const COMPANY_OVERRIDES: Record<string, string> = {
   bgeinc: 'BGE, Inc.',
   homelight: 'HomeLight',
   figure: 'FIGURE',
   extenteam: 'ExtenTeam',
-  // add more overrides as you see weird ones
 };
 
 function formatCompany(raw: string) {
   const key = normalizeSpace(raw).toLowerCase().replace(/[^a-z0-9]/g, '');
   if (COMPANY_OVERRIDES[key]) return COMPANY_OVERRIDES[key];
 
-  // If it looks like a slug (no spaces), try to title-case it anyway
-  const cleaned = normalizeSpace(raw);
-
-  // Preserve acronyms
-  const words = cleaned
-    .replace(/[_-]+/g, ' ')
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => {
-      const up = w.toUpperCase();
-      if (up === 'LLC' || up === 'LP' || up === 'LLP' || up === 'INC' || up === 'CO' || up === 'REIT') return up;
-      if (w.length <= 3 && w === up) return up; // short acronyms
-      // If the word is all-caps and longer, keep it (e.g. "JLL")
-      if (w === up && w.length <= 5) return up;
-      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-    });
+  const cleaned = normalizeSpace(raw).replace(/[_-]+/g, ' ');
+  const words = cleaned.split(' ').filter(Boolean).map((w) => {
+    const up = w.toUpperCase();
+    if (['LLC', 'LP', 'LLP', 'INC', 'REIT'].includes(up)) return up;
+    if (w === up && w.length <= 5) return up; // acronyms like JLL
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  });
 
   return words.join(' ');
 }
@@ -135,19 +68,11 @@ function formatCompany(raw: string) {
 function normalizeStateToAbbr(state: string | null | undefined): string | null {
   if (!state) return null;
   const s = normalizeSpace(state);
-
-  // Already 2-letter?
   if (/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase();
-
-  // Common cases like "CA " or "California "
-  const asAbbr = STATE_TO_ABBR[s];
-  if (asAbbr) return asAbbr;
-
-  // Sometimes stored as lowercase
+  if (STATE_TO_ABBR[s]) return STATE_TO_ABBR[s];
   const match = Object.keys(STATE_TO_ABBR).find((k) => k.toLowerCase() === s.toLowerCase());
   if (match) return STATE_TO_ABBR[match];
-
-  return s; // fallback (won’t break UI)
+  return s;
 }
 
 function isRemote(job: Job) {
@@ -175,30 +100,27 @@ function fmtDate(d: string | null | undefined) {
   }
 }
 
-// Try to extract pay guidance if not stored in a column
+// Extract pay guidance from description (no DB column required)
 function extractPay(job: Job): string | null {
-  if (job.pay && normalizeSpace(job.pay)) return normalizeSpace(job.pay);
-
   const text = job.description ? stripHtml(job.description) : '';
   if (!text) return null;
 
-  // Patterns like "Pay: $150,000-$180,000" or "$150,000 - $180,000"
   const payLabel = text.match(/(?:Pay|Salary|Compensation)\s*:\s*([^\n\r]{3,80})/i);
   if (payLabel?.[1]) return normalizeSpace(payLabel[1]).slice(0, 80);
 
   const range = text.match(/\$\s?\d{2,3}(?:,\d{3})+(?:\s?(?:–|-)\s?\$\s?\d{2,3}(?:,\d{3})+)?(?:\s?\/\s?(?:yr|year|hr|hour))?/i);
   if (range?.[0]) return normalizeSpace(range[0]).slice(0, 80);
 
-  // “401k” etc is not pay guidance; ignore
   return null;
 }
 
 export default function BoardPage() {
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
   const [q, setQ] = useState('');
   const [company, setCompany] = useState('ALL');
   const [stateAbbr, setStateAbbr] = useState('ALL');
@@ -206,7 +128,6 @@ export default function BoardPage() {
   const [source, setSource] = useState('ALL');
   const [remoteOnly, setRemoteOnly] = useState(false);
 
-  // Pagination
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -214,7 +135,7 @@ export default function BoardPage() {
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!url || !anon) {
-      setError('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+      setError('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in Coolify env vars.');
       setLoading(false);
       return;
     }
@@ -225,16 +146,15 @@ export default function BoardPage() {
       setLoading(true);
       setError(null);
       try {
-        // Pull a big batch for client-side filtering (simple + reliable)
+        // IMPORTANT: only select columns we know exist (no "pay" column)
         const { data, error: qErr } = await supabase
           .from('jobs')
-          .select(
-            'id,title,company,location_city,location_state,location_raw,job_type,employment_type,url,posted_at,created_at,source,description,pay'
-          )
+          .select('id,title,company,location_city,location_state,location_raw,job_type,employment_type,url,posted_at,created_at,source,description')
           .order('posted_at', { ascending: false })
           .range(0, 4999);
 
         if (qErr) throw qErr;
+
         setJobs((data || []) as Job[]);
       } catch (e: any) {
         setError(e?.message || 'Failed to load jobs');
@@ -244,7 +164,6 @@ export default function BoardPage() {
     })();
   }, []);
 
-  // Build dropdown options from all jobs (not filtered)
   const companyOptions = useMemo(() => {
     const set = new Set<string>();
     for (const j of jobs) if (j.company) set.add(formatCompany(j.company));
@@ -290,45 +209,19 @@ export default function BoardPage() {
       return hay.includes(query);
     };
 
-    const matchesCompany = (j: Job) => {
-      if (company === 'ALL') return true;
-      return formatCompany(j.company || '') === company;
-    };
+    const matchesCompany = (j: Job) => company === 'ALL' || formatCompany(j.company || '') === company;
+    const matchesState = (j: Job) => stateAbbr === 'ALL' || normalizeStateToAbbr(j.location_state) === stateAbbr;
+    const matchesCategory = (j: Job) => category === 'ALL' || normalizeSpace(j.job_type || '') === category;
+    const matchesSource = (j: Job) => source === 'ALL' || normalizeSpace(j.source || '') === source;
+    const matchesRemote = (j: Job) => !remoteOnly || isRemote(j);
 
-    const matchesState = (j: Job) => {
-      if (stateAbbr === 'ALL') return true;
-      const ab = normalizeStateToAbbr(j.location_state);
-      return ab === stateAbbr;
-    };
-
-    const matchesCategory = (j: Job) => {
-      if (category === 'ALL') return true;
-      return normalizeSpace(j.job_type || '') === category;
-    };
-
-    const matchesSource = (j: Job) => {
-      if (source === 'ALL') return true;
-      return normalizeSpace(j.source || '') === source;
-    };
-
-    const matchesRemote = (j: Job) => {
-      if (!remoteOnly) return true;
-      return isRemote(j);
-    };
-
-    const out = jobs.filter(
-      (j) =>
-        matchesText(j) && matchesCompany(j) && matchesState(j) && matchesCategory(j) && matchesSource(j) && matchesRemote(j)
-    );
-
-    return out;
+    return jobs.filter((j) => matchesText(j) && matchesCompany(j) && matchesState(j) && matchesCategory(j) && matchesSource(j) && matchesRemote(j));
   }, [jobs, q, company, stateAbbr, category, source, remoteOnly]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
 
   useEffect(() => {
-    // If filters shrink results, snap to page 1
     setPage(1);
   }, [q, company, stateAbbr, category, source, remoteOnly]);
 
@@ -345,43 +238,29 @@ export default function BoardPage() {
             HireCRE <span className="hc-pill">MVP</span>
           </Link>
           <nav className="hc-nav">
-            <Link href="/" className="hc-navlink">
-              Home
-            </Link>
-            <Link href="/board" className="hc-navlink hc-navlink-active">
-              Jobs
-            </Link>
+            <Link href="/" className="hc-navlink">Home</Link>
+            <Link href="/board" className="hc-navlink hc-navlink-active">Jobs</Link>
+            <Link href="/login" className="hc-navlink">Login</Link>
           </nav>
         </div>
       </header>
 
       <main className="hc-main">
         <section className="hc-hero">
-          <h1>Find a job in commercial real estate</h1>
-          <p>
-            Search across curated sources (starting with Greenhouse). Clean filters. Fast scanning. No fluff.
-          </p>
+          <h1>Commercial real estate jobs</h1>
+          <p>Search across curated sources. Clean filters. Fast scanning.</p>
 
           <div className="hc-filters">
             <div className="hc-filter">
               <label>What</label>
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Title, company, location…"
-                className="hc-input"
-              />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Title, company, location…" className="hc-input" />
             </div>
 
             <div className="hc-filter">
               <label>Company</label>
               <select value={company} onChange={(e) => setCompany(e.target.value)} className="hc-select">
                 <option value="ALL">All companies</option>
-                {companyOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {companyOptions.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
@@ -389,11 +268,7 @@ export default function BoardPage() {
               <label>State</label>
               <select value={stateAbbr} onChange={(e) => setStateAbbr(e.target.value)} className="hc-select">
                 <option value="ALL">All states</option>
-                {stateOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
+                {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
@@ -401,11 +276,7 @@ export default function BoardPage() {
               <label>Category</label>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className="hc-select">
                 <option value="ALL">All categories</option>
-                {categoryOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
@@ -413,11 +284,7 @@ export default function BoardPage() {
               <label>Source</label>
               <select value={source} onChange={(e) => setSource(e.target.value)} className="hc-select">
                 <option value="ALL">All sources</option>
-                {sourceOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
+                {sourceOptions.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
@@ -434,7 +301,7 @@ export default function BoardPage() {
             {loading ? (
               <span>Loading…</span>
             ) : error ? (
-              <span className="hc-error">{error}</span>
+              <span className="hc-error">Error loading jobs: {error}</span>
             ) : (
               <span>
                 Showing <strong>{filtered.length.toLocaleString()}</strong> jobs
@@ -470,9 +337,7 @@ export default function BoardPage() {
                 </div>
 
                 <div className="hc-card-actions">
-                  <a className="hc-btn" href={j.url} target="_blank" rel="noreferrer">
-                    View job
-                  </a>
+                  <a className="hc-btn" href={j.url} target="_blank" rel="noreferrer">View job</a>
                 </div>
               </article>
             );
@@ -484,27 +349,11 @@ export default function BoardPage() {
 
           {!loading && !error && filtered.length > 0 ? (
             <div className="hc-pagination">
-              <button className="hc-pagebtn" onClick={() => setPage(1)} disabled={safePage === 1}>
-                « First
-              </button>
-              <button className="hc-pagebtn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}>
-                ‹ Prev
-              </button>
-
-              <span className="hc-pages">
-                Page <strong>{safePage}</strong> of <strong>{pageCount}</strong>
-              </span>
-
-              <button
-                className="hc-pagebtn"
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                disabled={safePage === pageCount}
-              >
-                Next ›
-              </button>
-              <button className="hc-pagebtn" onClick={() => setPage(pageCount)} disabled={safePage === pageCount}>
-                Last »
-              </button>
+              <button className="hc-pagebtn" onClick={() => setPage(1)} disabled={safePage === 1}>« First</button>
+              <button className="hc-pagebtn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}>‹ Prev</button>
+              <span className="hc-pages">Page <strong>{safePage}</strong> of <strong>{pageCount}</strong></span>
+              <button className="hc-pagebtn" onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={safePage === pageCount}>Next ›</button>
+              <button className="hc-pagebtn" onClick={() => setPage(pageCount)} disabled={safePage === pageCount}>Last »</button>
             </div>
           ) : null}
         </section>
