@@ -1,12 +1,11 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { createClient } from '@supabase/supabase-js';
 
 type Job = {
   id: string;
-  source?: string | null;
-  source_job_id?: string | null;
   title: string;
   company: string;
   location_city?: string | null;
@@ -14,114 +13,183 @@ type Job = {
   location_raw?: string | null;
   job_type?: string | null;
   employment_type?: string | null;
-  url?: string | null;
+  url: string;
   posted_at?: string | null;
   created_at?: string | null;
+  source?: string | null;
   description?: string | null;
+  pay?: string | null; // optional if you later add a DB column
 };
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const PAGE_SIZE = 25;
 
-// Fix ugly slugs -> display names (add more anytime)
-const COMPANY_OVERRIDES: Record<string, string> = {
-  bgeinc: "BGE, Inc.",
-  homelight: "HomeLight",
-  figure: "FIGURE",
+// ---- State name -> abbreviation (includes DC) ----
+const STATE_TO_ABBR: Record<string, string> = {
+  Alabama: 'AL',
+  Alaska: 'AK',
+  Arizona: 'AZ',
+  Arkansas: 'AR',
+  California: 'CA',
+  Colorado: 'CO',
+  Connecticut: 'CT',
+  Delaware: 'DE',
+  'District of Columbia': 'DC',
+  Florida: 'FL',
+  Georgia: 'GA',
+  Hawaii: 'HI',
+  Idaho: 'ID',
+  Illinois: 'IL',
+  Indiana: 'IN',
+  Iowa: 'IA',
+  Kansas: 'KS',
+  Kentucky: 'KY',
+  Louisiana: 'LA',
+  Maine: 'ME',
+  Maryland: 'MD',
+  Massachusetts: 'MA',
+  Michigan: 'MI',
+  Minnesota: 'MN',
+  Mississippi: 'MS',
+  Missouri: 'MO',
+  Montana: 'MT',
+  Nebraska: 'NE',
+  Nevada: 'NV',
+  'New Hampshire': 'NH',
+  'New Jersey': 'NJ',
+  'New Mexico': 'NM',
+  'New York': 'NY',
+  'North Carolina': 'NC',
+  'North Dakota': 'ND',
+  Ohio: 'OH',
+  Oklahoma: 'OK',
+  Oregon: 'OR',
+  Pennsylvania: 'PA',
+  'Rhode Island': 'RI',
+  'South Carolina': 'SC',
+  'South Dakota': 'SD',
+  Tennessee: 'TN',
+  Texas: 'TX',
+  Utah: 'UT',
+  Vermont: 'VT',
+  Virginia: 'VA',
+  Washington: 'WA',
+  'West Virginia': 'WV',
+  Wisconsin: 'WI',
+  Wyoming: 'WY',
 };
 
-const US_STATE_TO_ABBR: Record<string, string> = {
-  "alabama": "AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO","connecticut":"CT",
-  "delaware":"DE","district of columbia":"DC","florida":"FL","georgia":"GA","hawaii":"HI","idaho":"ID","illinois":"IL",
-  "indiana":"IN","iowa":"IA","kansas":"KS","kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA",
-  "michigan":"MI","minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT","nebraska":"NE","nevada":"NV",
-  "new hampshire":"NH","new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND",
-  "ohio":"OH","oklahoma":"OK","oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC","south dakota":"SD",
-  "tennessee":"TN","texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA","west virginia":"WV",
-  "wisconsin":"WI","wyoming":"WY",
-};
-
-function titleCaseLoose(input: string) {
-  const s = input.replace(/[_-]+/g, " ").trim();
-  return s
-    .split(/\s+/)
-    .map((w) => {
-      if (!w) return w;
-      if (w.length <= 4 && w === w.toUpperCase()) return w; // keep acronyms
-      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
-    })
-    .join(" ");
+function normalizeSpace(s: string) {
+  return s.replace(/\s+/g, ' ').trim();
 }
 
-function formatCompany(company: string) {
-  const key = company.trim().toLowerCase();
+function stripHtml(html: string) {
+  return normalizeSpace(html.replace(/<[^>]*>/g, ' '));
+}
+
+function toTitleCase(input: string) {
+  const s = normalizeSpace(input.toLowerCase());
+  // Keep common small words lower unless first
+  const small = new Set(['and', 'or', 'the', 'of', 'to', 'in', 'at', 'for', 'a', 'an']);
+  return s
+    .split(' ')
+    .map((w, i) => {
+      if (!w) return w;
+      if (i !== 0 && small.has(w)) return w;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(' ');
+}
+
+const COMPANY_OVERRIDES: Record<string, string> = {
+  bgeinc: 'BGE, Inc.',
+  homelight: 'HomeLight',
+  figure: 'FIGURE',
+  extenteam: 'ExtenTeam',
+  // add more overrides as you see weird ones
+};
+
+function formatCompany(raw: string) {
+  const key = normalizeSpace(raw).toLowerCase().replace(/[^a-z0-9]/g, '');
   if (COMPANY_OVERRIDES[key]) return COMPANY_OVERRIDES[key];
 
-  // If it's a slug with no spaces and all lowercase, title-case it
-  if (!company.includes(" ") && company === company.toLowerCase()) {
-    return titleCaseLoose(company);
-  }
+  // If it looks like a slug (no spaces), try to title-case it anyway
+  const cleaned = normalizeSpace(raw);
 
-  return titleCaseLoose(company);
-}
-
-function normalizeState(state?: string | null) {
-  if (!state) return null;
-  const s = state.trim();
-  if (!s) return null;
-  if (s.length === 2) return s.toUpperCase();
-  const lower = s.toLowerCase();
-  return US_STATE_TO_ABBR[lower] || s; // fallback for non-US / unknown
-}
-
-function fmtDate(d?: string | null) {
-  if (!d) return "";
-  try {
-    return new Date(d).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+  // Preserve acronyms
+  const words = cleaned
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => {
+      const up = w.toUpperCase();
+      if (up === 'LLC' || up === 'LP' || up === 'LLP' || up === 'INC' || up === 'CO' || up === 'REIT') return up;
+      if (w.length <= 3 && w === up) return up; // short acronyms
+      // If the word is all-caps and longer, keep it (e.g. "JLL")
+      if (w === up && w.length <= 5) return up;
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
     });
+
+  return words.join(' ');
+}
+
+function normalizeStateToAbbr(state: string | null | undefined): string | null {
+  if (!state) return null;
+  const s = normalizeSpace(state);
+
+  // Already 2-letter?
+  if (/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase();
+
+  // Common cases like "CA " or "California "
+  const asAbbr = STATE_TO_ABBR[s];
+  if (asAbbr) return asAbbr;
+
+  // Sometimes stored as lowercase
+  const match = Object.keys(STATE_TO_ABBR).find((k) => k.toLowerCase() === s.toLowerCase());
+  if (match) return STATE_TO_ABBR[match];
+
+  return s; // fallback (won’t break UI)
+}
+
+function isRemote(job: Job) {
+  const raw = (job.location_raw || '').toLowerCase();
+  const city = (job.location_city || '').toLowerCase();
+  const state = (job.location_state || '').toLowerCase();
+  return raw.includes('remote') || city.includes('remote') || state.includes('remote');
+}
+
+function fmtLocation(job: Job) {
+  if (isRemote(job)) return 'Remote';
+  const city = job.location_city ? normalizeSpace(job.location_city) : '';
+  const st = normalizeStateToAbbr(job.location_state);
+  if (city && st) return `${city}, ${st}`;
+  if (job.location_raw) return normalizeSpace(job.location_raw);
+  return '—';
+}
+
+function fmtDate(d: string | null | undefined) {
+  if (!d) return '';
+  try {
+    return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
-    return "";
+    return '';
   }
 }
 
-function isRemote(j: Job) {
-  const loc = `${j.location_raw || ""} ${j.location_city || ""} ${j.location_state || ""}`.toLowerCase();
-  return loc.includes("remote");
-}
+// Try to extract pay guidance if not stored in a column
+function extractPay(job: Job): string | null {
+  if (job.pay && normalizeSpace(job.pay)) return normalizeSpace(job.pay);
 
-function fmtLocation(j: Job) {
-  const city = (j.location_city || "").trim();
-  const st = normalizeState(j.location_state);
-  const raw = (j.location_raw || "").trim();
+  const text = job.description ? stripHtml(job.description) : '';
+  if (!text) return null;
 
-  if (city && st) return `${city}, ${st}`;
-  if (raw) return raw;
-  if (st) return st;
-  return "—";
-}
+  // Patterns like "Pay: $150,000-$180,000" or "$150,000 - $180,000"
+  const payLabel = text.match(/(?:Pay|Salary|Compensation)\s*:\s*([^\n\r]{3,80})/i);
+  if (payLabel?.[1]) return normalizeSpace(payLabel[1]).slice(0, 80);
 
-// Best-effort salary extraction from description text (no DB changes needed)
-function payFromDescription(desc?: string | null): string | null {
-  if (!desc) return null;
-  const t = desc.replace(/\s+/g, " ");
+  const range = text.match(/\$\s?\d{2,3}(?:,\d{3})+(?:\s?(?:–|-)\s?\$\s?\d{2,3}(?:,\d{3})+)?(?:\s?\/\s?(?:yr|year|hr|hour))?/i);
+  if (range?.[0]) return normalizeSpace(range[0]).slice(0, 80);
 
-  const range =
-    t.match(/(\$|£|€)\s?\d[\d,\.]*\s?(k|m)?\s?[-–]\s?(\$|£|€)?\s?\d[\d,\.]*\s?(k|m)?\s?(\/\s?(year|yr|hour|hr))?/i) ||
-    t.match(/\b\d{2,3}\s?(k|K)\s?[-–]\s?\d{2,3}\s?(k|K)\b/);
-
-  if (range?.[0]) return range[0].replace(/\s+/g, " ").trim();
-
-  const single =
-    t.match(/(\$|£|€)\s?\d[\d,\.]*\s?(k|m)?\s?(\/\s?(year|yr|hour|hr))?/i) ||
-    t.match(/\b\d{2,3}\s?(k|K)\b/);
-
-  if (single?.[0]) return single[0].replace(/\s+/g, " ").trim();
-
+  // “401k” etc is not pay guidance; ignore
   return null;
 }
 
@@ -129,282 +197,325 @@ export default function BoardPage() {
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // Filters
-  const [query, setQuery] = useState("");
-  const [company, setCompany] = useState("ALL");
-  const [state, setState] = useState("ALL");
-  const [source, setSource] = useState("ALL");
+  const [q, setQ] = useState('');
+  const [company, setCompany] = useState('ALL');
+  const [stateAbbr, setStateAbbr] = useState('ALL');
+  const [category, setCategory] = useState('ALL');
+  const [source, setSource] = useState('ALL');
   const [remoteOnly, setRemoteOnly] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 30;
 
   useEffect(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !anon) {
+      setError('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+      setLoading(false);
+      return;
+    }
+
+    const supabase = createClient(url, anon);
+
     (async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
+        // Pull a big batch for client-side filtering (simple + reliable)
+        const { data, error: qErr } = await supabase
+          .from('jobs')
+          .select(
+            'id,title,company,location_city,location_state,location_raw,job_type,employment_type,url,posted_at,created_at,source,description,pay'
+          )
+          .order('posted_at', { ascending: false })
+          .range(0, 4999);
 
-        const { data: auth } = await supabase.auth.getUser();
-        setUserEmail(auth.user?.email ?? null);
-
-        // Only select columns we KNOW exist (avoid breaking on missing salary columns)
-        const { data, error } = await supabase
-          .from("jobs")
-          .select("id, source, source_job_id, title, company, location_city, location_state, location_raw, job_type, employment_type, url, posted_at, created_at, description")
-          .order("posted_at", { ascending: false, nullsFirst: false })
-          .limit(5000);
-
-        if (error) throw error;
-        setJobs((data as Job[]) || []);
+        if (qErr) throw qErr;
+        setJobs((data || []) as Job[]);
       } catch (e: any) {
-        setError(e?.message || "Failed to load jobs");
+        setError(e?.message || 'Failed to load jobs');
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
+  // Build dropdown options from all jobs (not filtered)
   const companyOptions = useMemo(() => {
     const set = new Set<string>();
-    jobs.forEach((j) => set.add(formatCompany(j.company || "").trim()));
-    return ["ALL", ...Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b))];
+    for (const j of jobs) if (j.company) set.add(formatCompany(j.company));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [jobs]);
 
   const stateOptions = useMemo(() => {
     const set = new Set<string>();
-    jobs.forEach((j) => {
-      const st = normalizeState(j.location_state);
-      if (st) set.add(st);
-    });
-    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+    for (const j of jobs) {
+      const ab = normalizeStateToAbbr(j.location_state);
+      if (ab && /^[A-Z]{2}$/.test(ab)) set.add(ab);
+    }
+    return Array.from(set).sort();
+  }, [jobs]);
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const j of jobs) if (j.job_type) set.add(normalizeSpace(j.job_type));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [jobs]);
 
   const sourceOptions = useMemo(() => {
     const set = new Set<string>();
-    jobs.forEach((j) => {
-      const s = (j.source || "").trim();
-      if (s) set.add(s);
-    });
-    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+    for (const j of jobs) if (j.source) set.add(normalizeSpace(j.source));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [jobs]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const query = normalizeSpace(q).toLowerCase();
 
-    return jobs.filter((j) => {
-      const companyNice = formatCompany(j.company || "");
-      const st = normalizeState(j.location_state);
-
-      if (company !== "ALL" && companyNice !== company) return false;
-      if (state !== "ALL" && st !== state) return false;
-      if (source !== "ALL" && (j.source || "") !== source) return false;
-      if (remoteOnly && !isRemote(j)) return false;
-
-      if (!q) return true;
-
+    const matchesText = (j: Job) => {
+      if (!query) return true;
       const hay = [
-        j.title || "",
-        companyNice,
-        j.location_city || "",
-        st || "",
-        j.location_raw || "",
-        j.job_type || "",
-        j.employment_type || "",
+        j.title,
+        j.company ? formatCompany(j.company) : '',
+        j.location_city || '',
+        normalizeStateToAbbr(j.location_state) || '',
+        j.location_raw || '',
+        j.job_type || '',
       ]
-        .join(" ")
+        .join(' ')
         .toLowerCase();
+      return hay.includes(query);
+    };
 
-      return hay.includes(q);
-    });
-  }, [jobs, query, company, state, source, remoteOnly]);
+    const matchesCompany = (j: Job) => {
+      if (company === 'ALL') return true;
+      return formatCompany(j.company || '') === company;
+    };
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageSafe = Math.min(Math.max(1, page), totalPages);
+    const matchesState = (j: Job) => {
+      if (stateAbbr === 'ALL') return true;
+      const ab = normalizeStateToAbbr(j.location_state);
+      return ab === stateAbbr;
+    };
 
-  const pageItems = useMemo(() => {
-    const start = (pageSafe - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, pageSafe]);
+    const matchesCategory = (j: Job) => {
+      if (category === 'ALL') return true;
+      return normalizeSpace(j.job_type || '') === category;
+    };
+
+    const matchesSource = (j: Job) => {
+      if (source === 'ALL') return true;
+      return normalizeSpace(j.source || '') === source;
+    };
+
+    const matchesRemote = (j: Job) => {
+      if (!remoteOnly) return true;
+      return isRemote(j);
+    };
+
+    const out = jobs.filter(
+      (j) =>
+        matchesText(j) && matchesCompany(j) && matchesState(j) && matchesCategory(j) && matchesSource(j) && matchesRemote(j)
+    );
+
+    return out;
+  }, [jobs, q, company, stateAbbr, category, source, remoteOnly]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
 
   useEffect(() => {
+    // If filters shrink results, snap to page 1
     setPage(1);
-  }, [query, company, state, source, remoteOnly]);
+  }, [q, company, stateAbbr, category, source, remoteOnly]);
+
+  const pageJobs = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, safePage]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight">Jobs</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {userEmail ? `Signed in as ${userEmail}` : "Not signed in"}
-        </p>
-      </div>
+    <div className="hc-page">
+      <header className="hc-header">
+        <div className="hc-header-inner">
+          <Link href="/" className="hc-logo">
+            HireCRE <span className="hc-pill">MVP</span>
+          </Link>
+          <nav className="hc-nav">
+            <Link href="/" className="hc-navlink">
+              Home
+            </Link>
+            <Link href="/board" className="hc-navlink hc-navlink-active">
+              Jobs
+            </Link>
+          </nav>
+        </div>
+      </header>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {/* Filters */}
-        <div className="grid gap-3 border-b border-slate-200 p-4 md:grid-cols-5">
-          <input
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100 md:col-span-2"
-            placeholder="Search title, company, location…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+      <main className="hc-main">
+        <section className="hc-hero">
+          <h1>Find a job in commercial real estate</h1>
+          <p>
+            Search across curated sources (starting with Greenhouse). Clean filters. Fast scanning. No fluff.
+          </p>
 
-          <select
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-          >
-            {companyOptions.map((c) => (
-              <option key={c} value={c}>
-                {c === "ALL" ? "All companies" : c}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-            value={state}
-            onChange={(e) => setState(e.target.value)}
-          >
-            {stateOptions.map((s) => (
-              <option key={s} value={s}>
-                {s === "ALL" ? "All states" : s}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-3">
-            <select
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-              value={source}
-              onChange={(e) => setSource(e.target.value)}
-            >
-              {sourceOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s === "ALL" ? "All sources" : s}
-                </option>
-              ))}
-            </select>
-
-            <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700">
+          <div className="hc-filters">
+            <div className="hc-filter">
+              <label>What</label>
               <input
-                type="checkbox"
-                checked={remoteOnly}
-                onChange={(e) => setRemoteOnly(e.target.checked)}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Title, company, location…"
+                className="hc-input"
               />
-              Remote
-            </label>
+            </div>
+
+            <div className="hc-filter">
+              <label>Company</label>
+              <select value={company} onChange={(e) => setCompany(e.target.value)} className="hc-select">
+                <option value="ALL">All companies</option>
+                {companyOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="hc-filter">
+              <label>State</label>
+              <select value={stateAbbr} onChange={(e) => setStateAbbr(e.target.value)} className="hc-select">
+                <option value="ALL">All states</option>
+                {stateOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="hc-filter">
+              <label>Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="hc-select">
+                <option value="ALL">All categories</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="hc-filter">
+              <label>Source</label>
+              <select value={source} onChange={(e) => setSource(e.target.value)} className="hc-select">
+                <option value="ALL">All sources</option>
+                {sourceOptions.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="hc-filter hc-filter-remote">
+              <label>&nbsp;</label>
+              <label className="hc-check">
+                <input type="checkbox" checked={remoteOnly} onChange={(e) => setRemoteOnly(e.target.checked)} />
+                Remote only
+              </label>
+            </div>
           </div>
-        </div>
 
-        {/* KPI */}
-        <div className="flex items-center justify-between px-4 pt-3 text-xs text-slate-600">
-          <div>{loading ? "Loading…" : `${filtered.length.toLocaleString()} jobs`}</div>
-          <div>{!loading && filtered.length > 0 ? `Page ${pageSafe} of ${totalPages}` : ""}</div>
-        </div>
+          <div className="hc-stats">
+            {loading ? (
+              <span>Loading…</span>
+            ) : error ? (
+              <span className="hc-error">{error}</span>
+            ) : (
+              <span>
+                Showing <strong>{filtered.length.toLocaleString()}</strong> jobs
+              </span>
+            )}
+          </div>
+        </section>
 
-        {/* List */}
-        <div className="grid gap-3 p-4">
-          {error && <div className="text-sm text-red-600">{error}</div>}
-          {!loading && filtered.length === 0 && (
-            <div className="text-sm text-slate-600">No jobs match your filters.</div>
-          )}
-
-          {pageItems.map((j) => {
-            const companyNice = formatCompany(j.company || "");
-            const loc = fmtLocation(j);
-            const src = (j.source || "").trim() || "—";
-            const date = fmtDate(j.posted_at || j.created_at);
-            const pay = payFromDescription(j.description);
-
+        <section className="hc-results">
+          {pageJobs.map((j) => {
+            const pay = extractPay(j);
             return (
-              <div
-                key={j.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-base font-semibold leading-snug text-slate-900">
+              <article key={j.id} className="hc-card">
+                <div className="hc-card-top">
+                  <div className="hc-card-title">
+                    <a href={j.url} target="_blank" rel="noreferrer" className="hc-titlelink">
                       {j.title}
-                    </div>
-
-                    {/* Company bigger + stands out */}
-                    <div className="mt-1 text-sm font-bold text-slate-900">
-                      {companyNice}
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-xs text-slate-700">
-                        {loc}
-                      </span>
-
-                      {isRemote(j) && (
-                        <span className="inline-flex h-7 items-center rounded-full border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-700">
-                          Remote
-                        </span>
-                      )}
-
-                      <span className="inline-flex h-7 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-xs text-slate-700">
-                        {src}
-                      </span>
-
-                      {pay && (
-                        <span className="inline-flex h-7 items-center rounded-full border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-700">
-                          Pay: {pay}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {j.url ? (
-                    <a
-                      href={j.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-100"
-                    >
-                      View
                     </a>
-                  ) : null}
-                </div>
+                    <div className="hc-company">{formatCompany(j.company)}</div>
+                  </div>
 
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-600">
-                  <div>{date ? `Posted ${date}` : ""}</div>
-                  <div className="text-right">
-                    {j.job_type ? j.job_type : ""}
-                    {j.job_type && j.employment_type ? " • " : ""}
-                    {j.employment_type ? j.employment_type : ""}
+                  <div className="hc-badges">
+                    {pay ? <span className="hc-badge hc-badge-pay">{pay}</span> : null}
+                    {isRemote(j) ? <span className="hc-badge">Remote</span> : null}
+                    {j.source ? <span className="hc-badge">{normalizeSpace(j.source)}</span> : null}
                   </div>
                 </div>
-              </div>
+
+                <div className="hc-meta">
+                  <span>{fmtLocation(j)}</span>
+                  {j.job_type ? <span>• {normalizeSpace(j.job_type)}</span> : null}
+                  {(j.posted_at || j.created_at) ? <span>• Posted {fmtDate(j.posted_at || j.created_at)}</span> : null}
+                </div>
+
+                <div className="hc-card-actions">
+                  <a className="hc-btn" href={j.url} target="_blank" rel="noreferrer">
+                    View job
+                  </a>
+                </div>
+              </article>
             );
           })}
 
-          {!loading && filtered.length > PAGE_SIZE && (
-            <div className="mt-2 flex justify-center gap-2">
-              <button
-                className="h-9 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={pageSafe <= 1}
-              >
-                Prev
+          {!loading && !error && filtered.length === 0 ? (
+            <div className="hc-empty">No jobs match these filters.</div>
+          ) : null}
+
+          {!loading && !error && filtered.length > 0 ? (
+            <div className="hc-pagination">
+              <button className="hc-pagebtn" onClick={() => setPage(1)} disabled={safePage === 1}>
+                « First
               </button>
+              <button className="hc-pagebtn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}>
+                ‹ Prev
+              </button>
+
+              <span className="hc-pages">
+                Page <strong>{safePage}</strong> of <strong>{pageCount}</strong>
+              </span>
+
               <button
-                className="h-9 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={pageSafe >= totalPages}
+                className="hc-pagebtn"
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                disabled={safePage === pageCount}
               >
-                Next
+                Next ›
+              </button>
+              <button className="hc-pagebtn" onClick={() => setPage(pageCount)} disabled={safePage === pageCount}>
+                Last »
               </button>
             </div>
-          )}
+          ) : null}
+        </section>
+      </main>
+
+      <footer className="hc-footer">
+        <div className="hc-footer-inner">
+          <span>HireCRE • Job board MVP</span>
+          <span className="hc-muted">Sources: Greenhouse (for now)</span>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
-
