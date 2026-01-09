@@ -42,7 +42,7 @@ export default function SignupPage() {
     <div className="hc-page">
       <header className="hc-header">
         <div className="hc-header-inner">
-          <Link href="/" className="hc-logo">HireCRE <span className="hc-pill">MVP</span></Link>
+          <Link href="/" className="hc-logo">HireCRE</Link>
           <nav className="hc-nav">
             <Link href="/" className="hc-navlink">Home</Link>
             <Link href="/board" className="hc-navlink">Jobs</Link>

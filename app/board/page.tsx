@@ -235,7 +235,7 @@ export default function BoardPage() {
       <header className="hc-header">
         <div className="hc-header-inner">
           <Link href="/" className="hc-logo">
-            HireCRE <span className="hc-pill">MVP</span>
+            HireCRE
           </Link>
           <nav className="hc-nav">
             <Link href="/" className="hc-navlink">Home</Link>
