@@ -104,6 +104,9 @@ type Job = {
   url: string | null;
   posted_at?: string | null;
   description?: string | null;
+pay?: string | null;
+  pay_text?: string | null;
+  salary?: string | null;
 
   // Optional columns that may or may not exist in your DB:
   pay?: string | null;
@@ -239,6 +242,13 @@ function isRemote(job: Job): boolean {
   return hay.includes("remote");
 }
 
+function hasPay(j: Job) {
+  const p = (j.pay ?? j.pay_text ?? j.salary ?? "").toString().trim();
+  return p.length > 0;
+}
+
+
+
 function fmtLocation(job: Job): string {
   const city = (job.location_city ?? "").trim();
   const state = normalizeState(job.location_state);
@@ -297,6 +307,8 @@ export default function BoardPage() {
   const [state, setState] = useState<string>("ALL");
   const [source, setSource] = useState<string>("ALL");
   const [remoteOnly, setRemoteOnly] = useState<boolean>(false);
+  const [payOnly, setPayOnly] = useState(false);
+
 
   // Paging
   const PAGE_SIZE = 25;
@@ -351,7 +363,7 @@ export default function BoardPage() {
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setPage(1);
-  }, [q, company, state, source, remoteOnly]);
+  }, [q, company, state, source, remoteOnly, payOnly]);
 
   // ----- Fetch jobs -----
   useEffect(() => {
@@ -534,6 +546,15 @@ export default function BoardPage() {
                 />
                 Remote only
               </label>
+
+<label className="inline-flex items-center gap-2">
+  <input
+    type="checkbox"
+    checked={payOnly}
+    onChange={(e) => setPayOnly(e.target.checked)}
+  />
+  <span>Pay shown</span>
+</label>
 
               <button
                 type="button"
