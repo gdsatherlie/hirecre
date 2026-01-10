@@ -564,6 +564,7 @@ export default function BoardPage() {
                   setState("ALL");
                   setSource("ALL");
                   setRemoteOnly(false);
+setPayOnly(false);
                 }}
                 className="text-sm font-semibold text-gray-700 hover:underline"
               >
