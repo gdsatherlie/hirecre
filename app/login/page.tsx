@@ -77,8 +77,6 @@ export default function LoginPage() {
 
       <footer className="hc-footer">
         <div className="hc-footer-inner">
-          <span>HireCRE • Job board MVP</span>
-          <span className="hc-muted">Auth: Supabase</span>
         </div>
       </footer>
     </div>
