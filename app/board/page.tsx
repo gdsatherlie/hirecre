@@ -94,22 +94,25 @@ type Job = {
 
   id: string;
   source?: string | null;
+
   title: string | null;
   company: string | null;
+
   location_city?: string | null;
   location_state?: string | null;
   location_raw?: string | null;
+
   job_type?: string | null;
   employment_type?: string | null;
+
   url: string | null;
   posted_at?: string | null;
-  description?: string | null;
-pay?: string | null;
-  pay_text?: string | null;
-  salary?: string | null;
 
-  // Optional columns that may or may not exist in your DB:
+  description?: string | null;
+
+  // Pay fields (some may not exist in your DB, that's OK)
   pay?: string | null;
+  pay_text?: string | null;
   salary?: string | null;
   compensation?: string | null;
 };
@@ -419,6 +422,20 @@ export default function BoardPage() {
             ].join(",")
           );
         }
+       
+	 if (payOnly) {
+          // Prefer explicit pay columns if they exist, plus a simple "$" fallback in text fields.
+          query = query.or(
+            [
+              "pay.not.is.null",
+              "pay_text.not.is.null",
+              "salary.not.is.null",
+              "compensation.not.is.null",
+              "description.ilike.%$%",
+              "location_raw.ilike.%$%",
+            ].join(",")
+          );
+        }
 
         const from = (page - 1) * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
@@ -436,7 +453,7 @@ export default function BoardPage() {
         setLoading(false);
       }
     })();
-  }, [q, company, state, source, remoteOnly, page]);
+  }, [q, company, state, source, remoteOnly, payOnly, page]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
 
@@ -547,14 +564,16 @@ export default function BoardPage() {
                 Remote only
               </label>
 
-<label className="inline-flex items-center gap-2">
+<label className="inline-flex items-center gap-2 text-sm text-gray-700">
   <input
     type="checkbox"
     checked={payOnly}
     onChange={(e) => setPayOnly(e.target.checked)}
+    className="h-4 w-4 rounded border-gray-300"
   />
-  <span>Pay shown</span>
+  Pay shown
 </label>
+
 
               <button
                 type="button"
