@@ -468,9 +468,6 @@ export default function BoardPage() {
               />
             </div>
 	
-	<div className="mt-6">
-  	<EmailSignup source="board" />
-	    </div>
 
             <div className="md:col-span-3">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Company</label>
@@ -487,6 +484,11 @@ export default function BoardPage() {
                 ))}
               </select>
             </div>
+
+
+	<div className="mt-6">
+  	<EmailSignup source="board" />
+	    </div>
 
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-700">State</label>
