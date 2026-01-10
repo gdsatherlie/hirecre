@@ -434,10 +434,7 @@ export default function BoardPage() {
   }
 
   return (
-      <div className="min-h-[calc(100vh-120px)] bg-gray-50">
-	<div className="mt-6">
-  	<EmailSignup source="board" />
-	    </div>      
+      <div className="min-h-[calc(100vh-120px)] bg-gray-50">    
 	<div className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -507,7 +504,9 @@ export default function BoardPage() {
                 ))}
               </select>
             </div>
-
+<div className="mt-6">
+  	<EmailSignup source="board" />
+	    </div>  
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Source</label>
               <select
