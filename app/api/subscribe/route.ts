@@ -1,16 +1,35 @@
-create table if not exists public.email_subscribers (
-  id uuid primary key default gen_random_uuid(),
-  email text not null unique,
-  source text,
-  created_at timestamptz not null default now()
-);
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-alter table public.email_subscribers enable row level security;
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 
-drop policy if exists "email_subscribers_insert_public" on public.email_subscribers;
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const email = String(body?.email ?? "").trim().toLowerCase();
+    const source = String(body?.source ?? "unknown").slice(0, 64);
 
-create policy "email_subscribers_insert_public"
-on public.email_subscribers
-for insert
-to anon, authenticated
-with check (true);
+    if (!email || !isValidEmail(email)) {
+      return NextResponse.json({ ok: false, error: "Invalid email" }, { status: 400 });
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const { error } = await supabase
+      .from("email_subscribers")
+      .upsert([{ email, source }], { onConflict: "email" });
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
+  }
+}

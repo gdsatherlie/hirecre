@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import EmailSignup from "@/components/EmailSignup";
 import { useRouter } from "next/navigation";
 import EmailSignup from "@/components/EmailSignup";
 import { createClient } from "@supabase/supabase-js";
