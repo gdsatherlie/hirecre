@@ -435,7 +435,10 @@ export default function BoardPage() {
 
   return (
       <div className="min-h-[calc(100vh-120px)] bg-gray-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
+	<div className="mt-6">
+  	<EmailSignup source="board" />
+	    </div>      
+	<div className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Jobs</h1>
@@ -450,9 +453,7 @@ export default function BoardPage() {
             </div>
           </div>
 
-<div className="mt-6">
-  	<EmailSignup source="board" />
-	    </div>
+
 
           <div className="text-sm text-gray-600">
             <span className="font-semibold text-gray-900">{count.toLocaleString()}</span> jobs
