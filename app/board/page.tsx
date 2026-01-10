@@ -504,9 +504,7 @@ export default function BoardPage() {
                 ))}
               </select>
             </div>
-<div className="mt-6">
-  	<EmailSignup source="board" />
-	    </div>  
+  
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Source</label>
               <select
@@ -522,7 +520,9 @@ export default function BoardPage() {
                 ))}
               </select>
             </div>
-
+	<div className="mt-6">
+  	<EmailSignup source="board" />
+	    </div>
             <div className="md:col-span-12 flex items-center gap-4 pt-1">
               <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input
