@@ -2,10 +2,97 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import EmailSignup from "@/components/EmailSignup";
 import { useRouter } from "next/navigation";
+import EmailSignup from "@/components/EmailSignup";
 import { createClient } from "@supabase/supabase-js";
 
 type Job = {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   id: string;
   source?: string | null;
   title: string | null;
@@ -381,6 +468,10 @@ export default function BoardPage() {
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
+	
+	<div className="mt-6">
+  	<EmailSignup source="board" />
+	    </div>
 
             <div className="md:col-span-3">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Company</label>

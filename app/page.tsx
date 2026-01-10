@@ -1,4 +1,5 @@
 import Link from "next/link";
+import EmailSignup from "@/components/EmailSignup";
 
 export default function HomePage() {
   return (
@@ -55,6 +56,10 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+	
+	<div className="mt-8">
+ 	 <EmailSignup source="home" />
+	</div>
 
         <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           <h2 className="text-xl font-semibold text-gray-900">What is this?</h2>
