@@ -438,6 +438,9 @@ export default function BoardPage() {
 	<div className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
+<div className="mb-6 w-full">
+  <EmailSignup source="board" />
+</div>
             <h1 className="text-2xl font-semibold text-gray-900">Jobs</h1>
             <div className="mt-1 text-sm text-gray-600">
               Signed in as <span className="font-medium">{userEmail ?? "…"}</span>
@@ -520,9 +523,7 @@ export default function BoardPage() {
                 ))}
               </select>
             </div>
-	<div className="mt-6">
-  	<EmailSignup source="board" />
-	    </div>
+
             <div className="md:col-span-12 flex items-center gap-4 pt-1">
               <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input
