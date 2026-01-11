@@ -28,6 +28,50 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
+function stripHtml(html = "") {
+  return String(html)
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractPayFromText(text = "") {
+  const t = String(text);
+
+  // common salary/range patterns
+  const patterns = [
+    /\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i,
+    /\$\s?\d{2,3}(?:,\d{3})+(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)/i,
+    /\$\s?\d+(?:,\d{3})*\s?(?:\/hour|\/hr|per hour|hr)/i,
+    /\b(OTE|On[-\s]?target earnings)\b.*?\$\s?\d/i,
+    /\b(base salary|salary range|compensation|pay range)\b.*?\$\s?\d/i,
+  ];
+
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (m?.[0]) return m[0].replace(/\s+/g, " ").trim();
+  }
+
+  // fallback: if there’s a $ and “salary/compensation” nearby, still capture it
+  if (/\$/.test(t) && /(salary|compensation|pay|hour|year|ote)/i.test(t)) {
+    return "Pay mentioned (see listing)";
+  }
+
+  return null;
+}
+
+function computePayFields({ title, location, content, description }) {
+  const combined = `${title ?? ""}\n${location ?? ""}\n${content ?? ""}\n${description ?? ""}`;
+  const plain = stripHtml(combined);
+  const pay = extractPayFromText(plain);
+  return { has_pay: Boolean(pay), pay_extracted: pay };
+}
+
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
@@ -188,6 +232,22 @@ async function main() {
 
         const { city, state } = parseCityState(locationRaw);
 
+	const { has_pay, pay_extracted } = computePayFields({
+	  title,
+	  location: locationRaw,
+	  content: j?.content,
+	  description: j?.content, // (Greenhouse "content" is basically the description)
+	});
+
+
+	// ---- Pay extraction (creates boolean + extracted snippet) ----
+	const payFields = computePayFields({
+	  title,
+	  location: locationRaw ?? "",
+	  content: j?.content ?? "",
+	  description: "", // we already pass content; keep this blank
+	});
+
         const fingerprint = buildFingerprint({
           source: "greenhouse",
           source_job_id: sourceJobId,
@@ -207,7 +267,13 @@ async function main() {
 
           url: jobUrl,
           description: normalize(j?.content) || null,
-          posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
+	  has_pay: payFields.has_pay,
+	  pay_extracted: payFields.pay_extracted,
+	  posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
+
+	  has_pay,
+	  pay_extracted,
+
 
           fingerprint,
 
