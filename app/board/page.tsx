@@ -610,7 +610,13 @@ setPayOnly(false);
                 const location = fmtLocation(job);
                 const posted = fmtDate(job.posted_at);
                 const remote = isRemote(job);
-                const pay = extractPay(job);
+                const pay =
+  		   (job.pay ?? "").toString().trim() ||
+  		   (job.pay_text ?? "").toString().trim() ||
+ 		   (job.salary ?? "").toString().trim() ||
+ 		   (job.compensation ?? "").toString().trim() ||
+  		   extractPay(job);
+
                 const sourceLabel = (job.source ?? "unknown").toLowerCase();
 
                 return (
@@ -644,12 +650,21 @@ setPayOnly(false);
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {remote && <Pill>Remote</Pill>}
-                          {job.job_type && <Pill>{job.job_type}</Pill>}
-                          {job.employment_type && <Pill>{job.employment_type}</Pill>}
-                          <Pill>{sourceLabel}</Pill>
-                          {pay && <Pill>Pay: {pay}</Pill>}
-                        </div>
+  			   {remote && <Pill>Remote</Pill>}
+  			   {job.job_type && <Pill>{job.job_type}</Pill>}
+   			   {job.employment_type && <Pill>{job.employment_type}</Pill>}
+ 			   <Pill>{sourceLabel}</Pill>
+
+  			   {pay ? <Pill>Pay: {pay}</Pill> : null}
+
+  			   {/* TEMP DEBUG — remove after 확인 */}
+  			   {payOnly ? (
+  			     <span className="text-xs text-gray-500">
+   			      debug pay fields: [{String(job.pay ?? "")}] [{String(job.pay_text ?? "")}] [{String(job.salary ?? "")}] [{String(job.compensation ?? "")}]
+    			     </span>
+ 		          ) : null}
+			</div>
+
 
                         <div className="mt-3 text-xs text-gray-500">
                           {posted ? `Posted ${posted}` : ""}
