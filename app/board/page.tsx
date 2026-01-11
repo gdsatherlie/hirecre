@@ -245,6 +245,21 @@ function isRemote(job: Job): boolean {
   return hay.includes("remote");
 }
 
+function employmentTag(job: Job): string | null {
+  const t = `${job.title ?? ""}\n${job.description ?? ""}`.toLowerCase();
+
+  // Part-time first so "part-time" doesn't get swallowed by other matches
+  if (t.includes("part-time") || t.includes("part time")) return "Part-time";
+  if (t.includes("full-time") || t.includes("full time")) return "Full-time";
+
+  // Optional extras (leave these in — they’re helpful and safe)
+  if (t.includes("contract")) return "Contract";
+  if (t.includes("intern")) return "Internship";
+
+  return null;
+}
+
+
 function hasPay(j: Job) {
   const p = (j.pay ?? j.pay_text ?? j.salary ?? "").toString().trim();
   return p.length > 0;
@@ -281,6 +296,18 @@ function extractPay(job: Job): string | null {
 
   return m ? m[0].replace(/\s+/g, " ").trim() : null;
 }
+
+function employmentTag(job: Job): string | null {
+  const t = `${job.title ?? ""}\n${job.description ?? ""}`.toLowerCase();
+
+  if (t.includes("part-time") || t.includes("part time")) return "Part-time";
+  if (t.includes("full-time") || t.includes("full time")) return "Full-time";
+  if (t.includes("contract")) return "Contract";
+  if (t.includes("intern")) return "Internship";
+
+  return null;
+}
+
 
 function Pill({ children }: { children: React.ReactNode }) {
   return (
@@ -625,6 +652,7 @@ setPayOnly(false);
                 const location = fmtLocation(job);
                 const posted = fmtDate(job.posted_at);
                 const remote = isRemote(job);
+		const emp = employmentTag(job);
                 const pay =
   		   (job.pay ?? "").toString().trim() ||
   		   (job.pay_text ?? "").toString().trim() ||
@@ -666,6 +694,7 @@ setPayOnly(false);
 
                         <div className="mt-3 flex flex-wrap gap-2">
   			   {remote && <Pill>Remote</Pill>}
+			   {emp && <Pill>{emp}</Pill>}
   			   {job.job_type && <Pill>{job.job_type}</Pill>}
    			   {job.employment_type && <Pill>{job.employment_type}</Pill>}
  			   <Pill>{sourceLabel}</Pill>
