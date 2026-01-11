@@ -254,25 +254,33 @@ async function main() {
           url: jobUrl,
         });
 
-        rows.push({
+	const { has_pay, pay_extracted } = computePayFields({
+	  title,
+	  location: locationRaw,
+ 	  content: j?.content,
+	  description: j?.content,
+	});
+       
+
+	 rows.push({
           source: "greenhouse",
           source_job_id: sourceJobId,
           source_company: companySlug,
 
-          title,
-          company: companySlug, // you can change later to "pretty name" if you want
-          location_raw: locationRaw,
-          location_city: city,
-          location_state: state,
+       title,
+  company: companySlug,
+  location_raw: locationRaw,
+  location_city: city,
+  location_state: state,
 
-          url: jobUrl,
-          description: normalize(j?.content) || null,
-	  has_pay: payFields.has_pay,
-	  pay_extracted: payFields.pay_extracted,
-	  posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
+  url: jobUrl,
+  description: normalize(j?.content) || null,
+  posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
 
-	  has_pay,
-	  pay_extracted,
+  // ✅ add these
+  has_pay,
+  pay_extracted,
+
 
 
           fingerprint,
