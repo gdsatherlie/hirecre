@@ -423,17 +423,10 @@ export default function BoardPage() {
           );
         }
        
-	 if (payOnly) {
-          // Prefer explicit pay columns if they exist, plus a simple "$" fallback in text fields.
-          query = query.or(
-            [
-              "pay.not.is.null",
-              "pay_text.not.is.null",
-              "salary.not.is.null",
-              "compensation.not.is.null",
-              "description.ilike.%$%",
-              "location_raw.ilike.%$%",
-            ].join(",")
+	if (payOnly) {
+  query = query.eq("has_pay", true);
+}
+
           );
         }
 
