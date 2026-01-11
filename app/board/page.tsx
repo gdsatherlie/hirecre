@@ -420,14 +420,13 @@ export default function BoardPage() {
               "location_city.ilike.%remote%",
               "location_state.ilike.%remote%",
             ].join(",")
-          );
+  );
+   
         }
        
 	if (payOnly) {
   query = query.eq("has_pay", true);
-}
 
-          );
         }
 
 	const from = (page - 1) * PAGE_SIZE;
