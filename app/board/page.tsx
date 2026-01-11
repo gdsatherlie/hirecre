@@ -437,15 +437,38 @@ export default function BoardPage() {
           );
         }
 
-        const from = (page - 1) * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
+	const from = (page - 1) * PAGE_SIZE;
+	const to = from + PAGE_SIZE - 1;
 
-        const { data, error, count: c } = await query.range(from, to);
+	if (payOnly) {
+ 	 // For "Pay shown", we need to filter using the SAME logic as the pill.
+ 	 // Easiest + reliable: fetch more rows, filter in JS, then paginate.
+ 	 const { data, error } = await query.limit(5000);
+	  if (error) throw error;
 
-        if (error) throw error;
+	  const rows = (data ?? []) as Job[];
 
-        setJobs((data ?? []) as Job[]);
-        setCount(c ?? 0);
+	  const withPay = rows.filter((j) => {
+	    const direct =
+	      (j.pay ?? "").toString().trim() ||
+	      (j.pay_text ?? "").toString().trim() ||
+	      (j.salary ?? "").toString().trim() ||
+	      (j.compensation ?? "").toString().trim();
+
+	    return Boolean(direct) || Boolean(extractPay(j));
+ 	 });
+	
+	  setCount(withPay.length);
+	  setJobs(withPay.slice(from, to + 1));
+	} else {
+ 	 // Normal mode: server-side pagination
+ 	 const { data, error, count: c } = await query.range(from, to);
+	  if (error) throw error;
+
+	  setJobs((data ?? []) as Job[]);
+	  setCount(c ?? 0);
+}
+
       } catch (e) {
         setJobs([]);
         setCount(0);
