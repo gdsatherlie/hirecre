@@ -304,16 +304,6 @@ function extractPay(job: Job): string | null {
   return m ? m[0].replace(/\s+/g, " ").trim() : null;
 }
 
-function employmentTag(job: Job): string | null {
-  const t = `${job.title ?? ""}\n${job.description ?? ""}`.toLowerCase();
-
-  if (t.includes("part-time") || t.includes("part time")) return "Part-time";
-  if (t.includes("full-time") || t.includes("full time")) return "Full-time";
-  if (t.includes("contract")) return "Contract";
-  if (t.includes("intern")) return "Internship";
-
-  return null;
-}
 
 
 function Pill({ children }: { children: React.ReactNode }) {
