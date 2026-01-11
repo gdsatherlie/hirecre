@@ -246,18 +246,25 @@ function isRemote(job: Job): boolean {
 }
 
 function employmentTag(job: Job): string | null {
-  const t = `${job.title ?? ""}\n${job.description ?? ""}`.toLowerCase();
+  const raw = `${job.title ?? ""}\n${job.description ?? ""}`;
 
-  // Part-time first so "part-time" doesn't get swallowed by other matches
+  // Normalize weird whitespace + weird hyphens Greenhouse sometimes uses
+  const t = raw
+    .toLowerCase()
+    .replace(/\u00a0/g, " ") // non-breaking space
+    .replace(/[\u2010-\u2015\u2212\u00ad]/g, "-"); // hyphen variants -> "-"
+
+  // Match part-time first
   if (t.includes("part-time") || t.includes("part time")) return "Part-time";
   if (t.includes("full-time") || t.includes("full time")) return "Full-time";
 
-  // Optional extras (leave these in — they’re helpful and safe)
+  // Optional extras
   if (t.includes("contract")) return "Contract";
   if (t.includes("intern")) return "Internship";
 
   return null;
 }
+
 
 
 function hasPay(j: Job) {
