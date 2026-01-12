@@ -4,7 +4,7 @@ import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import Script from "next/script";
 
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
+const GA_ID = process.env.NEXT_PUBLIC_GTAG_ID;
 
 export const metadata: Metadata = {
   title: "HireCRE — Commercial Real Estate Jobs",
