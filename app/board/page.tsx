@@ -674,7 +674,14 @@ setPayOnly(false);
 
   			   {pay ? <Pill>Pay: {pay}</Pill> : null}
 
-  			  
+  			   {/* TEMP DEBUG — remove after 확인 */}
+  			   {payOnly ? (
+  			     <span className="text-xs text-gray-500">
+   			      debug pay fields: [{String(job.pay ?? "")}] [{String(job.pay_text ?? "")}] [{String(job.salary ?? "")}] [{String(job.compensation ?? "")}]
+    			     </span>
+ 		          ) : null}
+			</div>
+
 
                         <div className="mt-3 text-xs text-gray-500">
                           {posted ? `Posted ${posted}` : ""}
