@@ -17,26 +17,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
 <head>
-  {GTAG_ID ? (
-    <>
-      <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GTAG_ID}`}
-        strategy="afterInteractive"
-      />
-      <Script
-        id="gtag-init"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GTAG_ID}');
-          `,
-        }}
-      />
-    </>
-  ) : null}
+  <Script
+  src={`https://www.googletagmanager.com/gtag/js?id=G-G-21RSXD1LLC`}
+  strategy="afterInteractive"
+/>
+<Script id="ga4" strategy="afterInteractive">
+  {`
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-G-21RSXD1LLC', { anonymize_ip: true });
+  `}
+</Script>
+
 </head>
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
         <SiteHeader />
