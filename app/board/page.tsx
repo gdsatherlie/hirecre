@@ -424,9 +424,9 @@ export default function BoardPage() {
               "location_state.ilike.%remote%",
             ].join(",")
   );
-
+   
         }
-
+       
 	if (payOnly) {
   query = query.eq("has_pay", true);
 
@@ -452,7 +452,7 @@ export default function BoardPage() {
 
 	    return Boolean(direct) || Boolean(extractPay(j));
  	 });
-
+	
 	  setCount(withPay.length);
 	  setJobs(withPay.slice(from, to + 1));
 	} else {
@@ -519,7 +519,7 @@ export default function BoardPage() {
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
-
+	
 
             <div className="md:col-span-3">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Company</label>
@@ -554,7 +554,7 @@ export default function BoardPage() {
                 ))}
               </select>
             </div>
-
+  
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Source</label>
               <select
@@ -674,7 +674,7 @@ setPayOnly(false);
 
   			   {pay ? <Pill>Pay: {pay}</Pill> : null}
 
-
+  			  
 
                         <div className="mt-3 text-xs text-gray-500">
                           {posted ? `Posted ${posted}` : ""}
