@@ -372,80 +372,113 @@ export default function BoardPage() {
   }, [q, company, state, source, remoteOnly, payOnly]);
 
   // ----- Fetch jobs -----
-useEffect(() => {
-  (async () => {
-    setLoading(true);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
 
-    try {
-      let query = supabase
-        .from("jobs")
-        .select("*", { count: "exact" })
-        .order("posted_at", { ascending: false });
+      try {
+        let query = supabase
+          .from("jobs")
+          .select("*", { count: "exact" })
+          .order("posted_at", { ascending: false });
 
-      const qq = q.trim();
-      if (qq) {
-        const esc = qq.replace(/,/g, "\\,");
-        query = query.or(
-          [
-            `title.ilike.%${esc}%`,
-            `company.ilike.%${esc}%`,
-            `location_raw.ilike.%${esc}%`,
-            `location_city.ilike.%${esc}%`,
-            `location_state.ilike.%${esc}%`,
-            `job_type.ilike.%${esc}%`,
-          ].join(",")
-        );
+        const qq = q.trim();
+        if (qq) {
+          const esc = qq.replace(/,/g, "\\,");
+          query = query.or(
+            [
+              `title.ilike.%${esc}%`,
+              `company.ilike.%${esc}%`,
+              `location_raw.ilike.%${esc}%`,
+              `location_city.ilike.%${esc}%`,
+              `location_state.ilike.%${esc}%`,
+              `job_type.ilike.%${esc}%`,
+            ].join(",")
+          );
+        }
+
+        if (company !== "ALL") {
+          // We store raw company in DB; do a looser match
+          query = query.ilike("company", `%${company}%`);
+        }
+
+        if (state !== "ALL") {
+          // Try match either abbreviation or full name if present in raw
+          query = query.or(
+            [
+              `location_state.ilike.%${state}%`,
+              `location_raw.ilike.%${state}%`,
+            ].join(",")
+          );
+        }
+
+        if (source !== "ALL") {
+          query = query.eq("source", source);
+        }
+
+        if (remoteOnly) {
+          query = query.or(
+            [
+              "location_raw.ilike.%remote%",
+              "location_city.ilike.%remote%",
+              "location_state.ilike.%remote%",
+            ].join(",")
+  );
+
+        }
+
+	if (payOnly) {
+  query = query.eq("has_pay", true);
+
+        }
+
+	const from = (page - 1) * PAGE_SIZE;
+	const to = from + PAGE_SIZE - 1;
+
+	if (payOnly) {
+ 	 // For "Pay shown", we need to filter using the SAME logic as the pill.
+ 	 // Easiest + reliable: fetch more rows, filter in JS, then paginate.
+ 	 const { data, error } = await query.limit(5000);
+	  if (error) throw error;
+
+	  const rows = (data ?? []) as Job[];
+
+	  const withPay = rows.filter((j) => {
+	    const direct =
+	      (j.pay ?? "").toString().trim() ||
+	      (j.pay_text ?? "").toString().trim() ||
+	      (j.salary ?? "").toString().trim() ||
+	      (j.compensation ?? "").toString().trim();
+
+	    return Boolean(direct) || Boolean(extractPay(j));
+ 	 });
+
+	  setCount(withPay.length);
+	  setJobs(withPay.slice(from, to + 1));
+	} else {
+ 	 // Normal mode: server-side pagination
+ 	 const { data, error, count: c } = await query.range(from, to);
+	  if (error) throw error;
+
+	  setJobs((data ?? []) as Job[]);
+	  setCount(c ?? 0);
+}
+
+      } catch (e) {
+        setJobs([]);
+        setCount(0);
+      } finally {
+        setLoading(false);
       }
-
-      if (company !== "ALL") query = query.ilike("company", `%${company}%`);
-
-      if (state !== "ALL") {
-        query = query.or(
-          [
-            `location_state.ilike.%${state}%`,
-            `location_raw.ilike.%${state}%`,
-          ].join(",")
-        );
-      }
-
-      if (source !== "ALL") query = query.eq("source", source);
-
-      if (remoteOnly) {
-        query = query.or(
-          [
-            "location_raw.ilike.%remote%",
-            "location_city.ilike.%remote%",
-            "location_state.ilike.%remote%",
-          ].join(",")
-        );
-      }
-
-      if (payOnly) {
-        query = query.eq("has_pay", true);
-      }
-
-      const from = (page - 1) * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-
-      const { data, error, count: c } = await query.range(from, to);
-      if (error) throw error;
-
-      setJobs((data ?? []) as Job[]);
-      setCount(c ?? 0);
-    } catch (e) {
-      setJobs([]);
-      setCount(0);
-    } finally {
-      setLoading(false);
-    }
-  })();
-}, [q, company, state, source, remoteOnly, payOnly, page]);
+    })();
+  }, [q, company, state, source, remoteOnly, payOnly, page]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
 
   async function signOut() {
     await supabase.auth.signOut();
     router.push("/login");
+  }
 
   return (
       <div className="min-h-[calc(100vh-120px)] bg-gray-50">    
@@ -486,7 +519,7 @@ useEffect(() => {
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
-	
+
 
             <div className="md:col-span-3">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Company</label>
@@ -521,7 +554,7 @@ useEffect(() => {
                 ))}
               </select>
             </div>
-  
+
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Source</label>
               <select
@@ -641,7 +674,8 @@ setPayOnly(false);
 
   			   {pay ? <Pill>Pay: {pay}</Pill> : null}
 
-  			  
+
+
                         <div className="mt-3 text-xs text-gray-500">
                           {posted ? `Posted ${posted}` : ""}
                         </div>
