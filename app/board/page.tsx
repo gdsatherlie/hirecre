@@ -446,7 +446,6 @@ useEffect(() => {
   async function signOut() {
     await supabase.auth.signOut();
     router.push("/login");
-  }
 
   return (
       <div className="min-h-[calc(100vh-120px)] bg-gray-50">    
