@@ -3,6 +3,7 @@ import "./globals.css";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import Script from "next/script";
+import Analytics from "@/components/analytics";
 
 const GA_ID = process.env.NEXT_PUBLIC_GTAG_ID;
 
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ) : null}
 
         <SiteHeader />
+	<Analytics />
         <main className="mx-auto w-full max-w-6xl px-4 py-10">{children}</main>
         <SiteFooter />
       </body>
