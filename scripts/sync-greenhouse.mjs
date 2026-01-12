@@ -272,6 +272,9 @@ async function main() {
   location_raw: locationRaw,
   location_city: city,
   location_state: state,
+  
+  employment_type: null,
+  job_type: null,
 
   url: jobUrl,
   description: normalize(j?.content) || null,

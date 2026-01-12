@@ -670,7 +670,6 @@ setPayOnly(false);
                         <div className="mt-3 flex flex-wrap gap-2">
   			   {remote && <Pill>Remote</Pill>}
   			   {job.job_type && <Pill>{job.job_type}</Pill>}
-   			   {job.employment_type && <Pill>{job.employment_type}</Pill>}
  			   <Pill>{sourceLabel}</Pill>
 
   			   {pay ? <Pill>Pay: {pay}</Pill> : null}
