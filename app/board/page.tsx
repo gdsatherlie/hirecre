@@ -245,6 +245,27 @@ function isRemote(job: Job): boolean {
   return hay.includes("remote");
 }
 
+function employmentTag(job: Job): string | null {
+  const raw = `${job.title ?? ""}\n${job.description ?? ""}`;
+
+  // Normalize weird whitespace + weird hyphens Greenhouse sometimes uses
+  const t = raw
+    .toLowerCase()
+    .replace(/\u00a0/g, " ") // non-breaking space
+    .replace(/[\u2010-\u2015\u2212\u00ad]/g, "-"); // hyphen variants -> "-"
+
+  // Match part-time first
+  if (t.includes("part-time") || t.includes("part time")) return "Part-time";
+  if (t.includes("full-time") || t.includes("full time")) return "Full-time";
+
+  // Optional extras
+  if (t.includes("contract")) return "Contract";
+  if (t.includes("intern")) return "Internship";
+
+  return null;
+}
+
+
 
 function hasPay(j: Job) {
   const p = (j.pay ?? j.pay_text ?? j.salary ?? "").toString().trim();
@@ -283,6 +304,16 @@ function extractPay(job: Job): string | null {
   return m ? m[0].replace(/\s+/g, " ").trim() : null;
 }
 
+function employmentTag(job: Job): string | null {
+  const t = `${job.title ?? ""}\n${job.description ?? ""}`.toLowerCase();
+
+  if (t.includes("part-time") || t.includes("part time")) return "Part-time";
+  if (t.includes("full-time") || t.includes("full time")) return "Full-time";
+  if (t.includes("contract")) return "Contract";
+  if (t.includes("intern")) return "Internship";
+
+  return null;
+}
 
 
 function Pill({ children }: { children: React.ReactNode }) {
@@ -628,6 +659,7 @@ setPayOnly(false);
                 const location = fmtLocation(job);
                 const posted = fmtDate(job.posted_at);
                 const remote = isRemote(job);
+		const emp = employmentTag(job);
                 const pay =
   		   (job.pay ?? "").toString().trim() ||
   		   (job.pay_text ?? "").toString().trim() ||
@@ -669,12 +701,22 @@ setPayOnly(false);
 
                         <div className="mt-3 flex flex-wrap gap-2">
   			   {remote && <Pill>Remote</Pill>}
+			   {emp && <Pill>{emp}</Pill>}
   			   {job.job_type && <Pill>{job.job_type}</Pill>}
+   			   {job.employment_type && <Pill>{job.employment_type}</Pill>}
  			   <Pill>{sourceLabel}</Pill>
 
   			   {pay ? <Pill>Pay: {pay}</Pill> : null}
 
-  			  
+  			   {/* TEMP DEBUG — remove after 확인 */}
+  			   {payOnly ? (
+  			     <span className="text-xs text-gray-500">
+   			      debug pay fields: [{String(job.pay ?? "")}] [{String(job.pay_text ?? "")}] [{String(job.salary ?? "")}] [{String(job.compensation ?? "")}]
+    			     </span>
+ 		          ) : null}
+			</div>
+
+
                         <div className="mt-3 text-xs text-gray-500">
                           {posted ? `Posted ${posted}` : ""}
                         </div>
