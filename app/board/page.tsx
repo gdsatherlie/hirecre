@@ -675,7 +675,6 @@ setPayOnly(false);
   			   {pay ? <Pill>Pay: {pay}</Pill> : null}
 
   			  
-
                         <div className="mt-3 text-xs text-gray-500">
                           {posted ? `Posted ${posted}` : ""}
                         </div>
