@@ -38,7 +38,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
         <SiteHeader />
-        <Analytics />
+
+{GA_ID ? <Analytics gaId={GA_ID} /> : null}
+
         <main className="mx-auto w-full max-w-6xl px-4 py-10">{children}</main>
         <SiteFooter />
       </body>
