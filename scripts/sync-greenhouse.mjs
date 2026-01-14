@@ -275,33 +275,130 @@ const locationRaw = bestLocation(
 };
        
 
+const US_STATE_NAME_TO_ABBR = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+  "district of columbia": "DC",
+};
+
+const US_STATE_ABBRS = new Set(Object.values(US_STATE_NAME_TO_ABBR));
+
 function parseCityState(locationRaw) {
-  const raw = cleanLocation(locationRaw);
+  const raw = normalize(locationRaw);
   if (!raw) return { city: null, state: null };
 
-  // don't guess remote
-  if (/remote/i.test(raw)) return { city: null, state: null };
+  // Treat "Remote" as no-state so it won't pollute filters
+  if (/remote/i.test(raw)) return { city: "Remote", state: null };
 
-  // If it's "City ST" (no comma)
-  const mNoComma = raw.match(/^(.+?)\s+([A-Z]{2})$/);
-  if (mNoComma) return { city: mNoComma[1].trim(), state: mNoComma[2].toUpperCase() };
+  // Clean common suffixes
+  const cleaned = raw
+    .replace(/\bUnited States\b/i, "")
+    .replace(/\bUSA\b/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  // Split by commas and inspect from the end (works for full addresses)
+  const parts = cleaned.split(",").map((p) => p.trim()).filter(Boolean);
 
-  // find a state code anywhere
-  let state = null;
-  let statePartIndex = -1;
+  // Helper: normalize possible state token
+  const toStateAbbr = (token) => {
+    if (!token) return null;
+    const t = token.trim();
+    // "TX" / "CA"
+    if (/^[A-Z]{2}$/.test(t) && US_STATE_ABBRS.has(t)) return t;
+    // "Texas" / "New York"
+    const lower = t.toLowerCase();
+    return US_STATE_NAME_TO_ABBR[lower] || null;
+  };
 
-  for (let i = 0; i < parts.length; i++) {
-    const m = parts[i].match(/\b([A-Z]{2})\b/);
-    if (m) {
-      state = m[1].toUpperCase();
-      statePartIndex = i;
-      break;
+  // Walk from end: find state (abbr or full name), then take previous part as city
+  for (let i = parts.length - 1; i >= 0; i--) {
+    // State might be in a token like "Texas 77042" or "TX 78728"
+    const token = parts[i];
+    const tokenWords = token.split(/\s+/);
+
+    // Try last 2 words joined for multi-word states (e.g., "New York")
+    const lastTwo = tokenWords.slice(-2).join(" ").toLowerCase();
+    const lastOne = tokenWords.slice(-1).join(" ").toLowerCase();
+
+    let state =
+      toStateAbbr(tokenWords.slice(-1)[0]?.toUpperCase()) ||
+      US_STATE_NAME_TO_ABBR[lastTwo] ||
+      US_STATE_NAME_TO_ABBR[lastOne];
+
+    // Also handle "TX 78728" where last token is ZIP and previous is state abbr
+    if (!state && tokenWords.length >= 2 && /^\d{5}(-\d{4})?$/.test(tokenWords[tokenWords.length - 1])) {
+      const prev = tokenWords[tokenWords.length - 2].toUpperCase();
+      if (US_STATE_ABBRS.has(prev)) state = prev;
+    }
+
+    if (state) {
+      const city = parts[i - 1] || null;
+
+      // If "city" looks like an address line, keep it but it will be displayed as-is
+      // (better than NULL, and filters will now work because state is correct)
+      return { city, state };
     }
   }
 
-  if (!state) return { city: null, state: null };
+  // Fallback: simple "City, ST"
+  if (parts.length >= 2) {
+    const city = parts[0] || null;
+    const state = toStateAbbr(parts[1].toUpperCase());
+    return { city, state };
+  }
+
+  return { city: null, state: null };
+}
+
 
   // choose a "city" token to the left of the state token
   // (skip tokens that look like address lines)
