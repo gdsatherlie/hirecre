@@ -254,7 +254,7 @@ async function main() {
           url: jobUrl,
         });
 
-	const { has_pay, pay_extracted } = computePayFields({
+	const { has_pay: has_pay2, pay_extracted: pay_extracted2 } = computePayFields(job);
 	  title,
 	  location: locationRaw,
  	  content: j?.content,
