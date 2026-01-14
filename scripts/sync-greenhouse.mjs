@@ -230,14 +230,72 @@ async function main() {
         const locationRaw =
           normalize(j?.location?.name) || normalize(j?.location?.location) || null;
 
-        const { city, state } = parseCityState(locationRaw);
+ const STATE_NAME_TO_CODE = {
+  Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
+  Colorado: "CO", Connecticut: "CT", Delaware: "DE", Florida: "FL", Georgia: "GA",
+  Hawaii: "HI", Idaho: "ID", Illinois: "IL", Indiana: "IN", Iowa: "IA", Kansas: "KS",
+  Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD", Massachusetts: "MA",
+  Michigan: "MI", Minnesota: "MN", Mississippi: "MS", Missouri: "MO", Montana: "MT",
+  Nebraska: "NE", Nevada: "NV", "New Hampshire": "NH", "New Jersey": "NJ",
+  "New Mexico": "NM", "New York": "NY", "North Carolina": "NC", "North Dakota": "ND",
+  Ohio: "OH", Oklahoma: "OK", Oregon: "OR", Pennsylvania: "PA",
+  "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD",
+  Tennessee: "TN", Texas: "TX", Utah: "UT", Vermont: "VT", Virginia: "VA",
+  Washington: "WA", "West Virginia": "WV", Wisconsin: "WI", Wyoming: "WY",
+  "District of Columbia": "DC",
+};
+       
 
-	const { has_pay, pay_extracted } = computePayFields({
-	  title,
-	  location: locationRaw,
-	  content: j?.content,
-	  description: j?.content, // (Greenhouse "content" is basically the description)
-	});
+
+function parseCityState(locationRaw) {
+  const raw = normalize(locationRaw);
+  if (!raw) return { city: null, state: null };
+
+  // Don't guess on "Remote"
+  if (/remote/i.test(raw)) return { city: null, state: null };
+
+  // Split by commas (works for "City, ST" and "..., City, StateName 12345")
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+
+  // 1) Look for a ", ST" anywhere (not just the 2nd token)
+  // Examples:
+  // "Rockville, MD"
+  // "New York, NY, United States"
+  // "Somewhere, IL 60601"
+  for (let i = 0; i < parts.length; i++) {
+    const m = parts[i].match(/\b([A-Z]{2})\b/);
+    if (m) {
+      const state = m[1].toUpperCase();
+      const city = i > 0 ? parts[i - 1] : (parts[0] || null);
+      return { city: city || null, state };
+    }
+  }
+
+  // 2) Look for full state name (Texas, Florida, etc.)
+  // Example: "... Houston, Texas 77042"
+  let state = null;
+  let stateNameFound = null;
+
+  for (const [name, code] of Object.entries(STATE_NAME_TO_CODE)) {
+    const re = new RegExp(`\\b${name}\\b`, "i");
+    if (re.test(raw)) {
+      state = code;
+      stateNameFound = name;
+      break;
+    }
+  }
+
+  if (!state) return { city: null, state: null };
+
+  // Try to infer city as the comma-part immediately before the state name part
+  let city = null;
+  const idx = parts.findIndex((p) =>
+    stateNameFound ? new RegExp(`\\b${stateNameFound}\\b`, "i").test(p) : false
+  );
+  if (idx > 0) city = parts[idx - 1] || null;
+
+  return { city, state };
+}
 
 
 	// ---- Pay extraction (creates boolean + extracted snippet) ----
