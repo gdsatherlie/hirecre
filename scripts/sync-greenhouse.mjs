@@ -254,13 +254,6 @@ async function main() {
           url: jobUrl,
         });
 
-	({ has_pay, pay_extracted } = computePayFields(job));
-
-	  title,
-	  location: locationRaw,
- 	  content: j?.content,
-	  description: j?.content,
-	});
        
 
 	 rows.push({
