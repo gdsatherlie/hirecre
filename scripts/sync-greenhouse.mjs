@@ -22,55 +22,9 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error(
-    "Missing env vars. Need SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
-  );
+  console.error("Missing env vars. Need SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
   process.exit(1);
 }
-
-function stripHtml(html = "") {
-  return String(html)
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractPayFromText(text = "") {
-  const t = String(text);
-
-  // common salary/range patterns
-  const patterns = [
-    /\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i,
-    /\$\s?\d{2,3}(?:,\d{3})+(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)/i,
-    /\$\s?\d+(?:,\d{3})*\s?(?:\/hour|\/hr|per hour|hr)/i,
-    /\b(OTE|On[-\s]?target earnings)\b.*?\$\s?\d/i,
-    /\b(base salary|salary range|compensation|pay range)\b.*?\$\s?\d/i,
-  ];
-
-  for (const re of patterns) {
-    const m = t.match(re);
-    if (m?.[0]) return m[0].replace(/\s+/g, " ").trim();
-  }
-
-  // fallback: if there’s a $ and “salary/compensation” nearby, still capture it
-  if (/\$/.test(t) && /(salary|compensation|pay|hour|year|ote)/i.test(t)) {
-    return "Pay mentioned (see listing)";
-  }
-
-  return null;
-}
-
-function computePayFields({ title, location, content, description }) {
-  const combined = `${title ?? ""}\n${location ?? ""}\n${content ?? ""}\n${description ?? ""}`;
-  const plain = stripHtml(combined);
-  const pay = extractPayFromText(plain);
-  return { has_pay: Boolean(pay), pay_extracted: pay };
-}
-
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -108,16 +62,79 @@ function shouldExcludeTitle(title) {
   return EXCLUDE_TITLE_KEYWORDS.some((kw) => t.includes(kw.toLowerCase()));
 }
 
+function stripHtml(html = "") {
+  return String(html)
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractPayFromText(text = "") {
+  const t = String(text);
+
+  const patterns = [
+    /\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i,
+    /\$\s?\d{2,3}(?:,\d{3})+(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)/i,
+    /\$\s?\d+(?:,\d{3})*\s?(?:\/hour|\/hr|per hour|hr)/i,
+    /\b(OTE|On[-\s]?target earnings)\b.*?\$\s?\d/i,
+    /\b(base salary|salary range|compensation|pay range)\b.*?\$\s?\d/i,
+  ];
+
+  for (const re of patterns) {
+    const m = t.match(re);
+    if (m?.[0]) return m[0].replace(/\s+/g, " ").trim();
+  }
+
+  if (/\$/.test(t) && /(salary|compensation|pay|hour|year|ote)/i.test(t)) {
+    return "Pay mentioned (see listing)";
+  }
+
+  return null;
+}
+
+function computePayFields({ title, location, content }) {
+  const combined = `${title ?? ""}\n${location ?? ""}\n${content ?? ""}`;
+  const plain = stripHtml(combined);
+  const pay = extractPayFromText(plain);
+  return { has_pay: Boolean(pay), pay_extracted: pay };
+}
+
+/**
+ * Improved parser:
+ * Works for:
+ * - "Chicago, IL"
+ * - "New York, NY, United States"
+ * - "101 W Louis Henna Blvd, Round Rock, TX 78664"
+ * - "Tampa, Florida" (state full name -> returns null unless you map it)
+ */
 function parseCityState(locationRaw) {
-  // Handles:
-  // "Chicago, IL"
-  // "New York, NY, United States"
-  // "Remote - US"
-  // If can't parse, returns { city: null, state: null }
   const raw = normalize(locationRaw);
   if (!raw) return { city: null, state: null };
 
-  // Common "City, ST" pattern
+  // Handle Remote-ish
+  if (/remote/i.test(raw)) return { city: "Remote", state: null };
+
+  // Try to find a US state abbreviation anywhere near the end (with optional ZIP)
+  // Example: ", TX 78664" or ", TX"
+  const stMatch = raw.match(/,\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*$/);
+  if (stMatch?.[1]) {
+    const state = stMatch[1];
+
+    // Split by commas and pick city as the token before the state token if possible
+    const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+
+    // Find last part that contains the state (e.g., "TX 78664" or "TX")
+    const idx = parts.findLastIndex((p) => new RegExp(`\\b${state}\\b`).test(p));
+    const city = idx > 0 ? parts[idx - 1] : parts[0] || null;
+
+    return { city: city || null, state };
+  }
+
+  // Fallback: classic "City, ST, ..." where ST is second chunk and short
   const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const city = parts[0] || null;
@@ -126,34 +143,9 @@ function parseCityState(locationRaw) {
     return { city, state };
   }
 
-  return { city: null, state: null };
+  // If it's just one token, treat as city-like label
+  return { city: raw, state: null };
 }
-
-function cleanLocation(s) {
-  return normalize(s).replace(/\.+$/, "").trim(); // remove trailing periods like "Santa Monica."
-}
-
-function scoreLocation(s) {
-  if (!s) return 0;
-  let score = 0;
-
-  if (/,/.test(s)) score += 3;                        // "City, ST" or "..., City, ST"
-  if (/\b[A-Z]{2}\b/.test(s)) score += 4;             // state code present
-  if (/\b(United States|USA)\b/i.test(s)) score += 1;  // bonus for full geo
-  if (/\d/.test(s)) score += 1;                       // address-ish (sometimes useful)
-  score += Math.min(s.length, 80) / 80;               // slight preference for more info
-
-  return score;
-}
-
-function bestLocation(...candidates) {
-  const cleaned = candidates.map(cleanLocation).filter(Boolean);
-  if (!cleaned.length) return null;
-
-  cleaned.sort((a, b) => scoreLocation(b) - scoreLocation(a));
-  return cleaned[0];
-}
-
 
 function sourcesFilePath() {
   const fromEnv = process.env.GREENHOUSE_SOURCES_FILE;
@@ -171,7 +163,6 @@ function readSources() {
 }
 
 async function fetchGreenhouseJobs(companySlug) {
-  // Greenhouse job board JSON endpoint (public)
   const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(
     companySlug
   )}/jobs?content=true`;
@@ -186,12 +177,10 @@ async function fetchGreenhouseJobs(companySlug) {
   }
 
   const data = await res.json();
-  const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
-  return jobs;
+  return Array.isArray(data?.jobs) ? data.jobs : [];
 }
 
 function buildFingerprint({ source, source_job_id, url }) {
-  // Keep it stable. Prefer source_job_id.
   const a = normalize(source);
   const b = normalize(source_job_id);
   const c = normalize(url);
@@ -199,21 +188,16 @@ function buildFingerprint({ source, source_job_id, url }) {
 }
 
 async function upsertJobs(rows) {
-  if (!rows.length) return { upserted: 0 };
+  if (!rows.length) return;
 
-  // IMPORTANT:
-  // This assumes you have a UNIQUE constraint on "fingerprint"
-  // (your earlier SQL included: fingerprint text unique)
   const { error } = await supabase
     .from("jobs")
     .upsert(rows, { onConflict: "fingerprint" });
 
   if (error) throw error;
-  return { upserted: rows.length };
 }
 
 async function markStaleInactive(companySlug, runIso) {
-  // Anything from this company not updated during this run becomes inactive
   const { error } = await supabase
     .from("jobs")
     .update({ is_active: false })
@@ -239,7 +223,6 @@ async function main() {
     try {
       const jobs = await fetchGreenhouseJobs(companySlug);
 
-      // Build rows for Supabase
       const rows = [];
       for (const j of jobs) {
         const title = normalize(j?.title);
@@ -247,189 +230,21 @@ async function main() {
         const sourceJobId = j?.id != null ? String(j.id) : null;
 
         if (!title || !jobUrl) continue;
-
         if (shouldExcludeTitle(title)) {
           totalSkipped += 1;
           continue;
         }
 
-const locationRaw = bestLocation(
-  j?.location?.location,
-  j?.location?.name
-);
+        const locationRaw =
+          normalize(j?.location?.name) || normalize(j?.location?.location) || null;
 
+        const { city, state } = parseCityState(locationRaw);
 
- const STATE_NAME_TO_CODE = {
-  Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA",
-  Colorado: "CO", Connecticut: "CT", Delaware: "DE", Florida: "FL", Georgia: "GA",
-  Hawaii: "HI", Idaho: "ID", Illinois: "IL", Indiana: "IN", Iowa: "IA", Kansas: "KS",
-  Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD", Massachusetts: "MA",
-  Michigan: "MI", Minnesota: "MN", Mississippi: "MS", Missouri: "MO", Montana: "MT",
-  Nebraska: "NE", Nevada: "NV", "New Hampshire": "NH", "New Jersey": "NJ",
-  "New Mexico": "NM", "New York": "NY", "North Carolina": "NC", "North Dakota": "ND",
-  Ohio: "OH", Oklahoma: "OK", Oregon: "OR", Pennsylvania: "PA",
-  "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD",
-  Tennessee: "TN", Texas: "TX", Utah: "UT", Vermont: "VT", Virginia: "VA",
-  Washington: "WA", "West Virginia": "WV", Wisconsin: "WI", Wyoming: "WY",
-  "District of Columbia": "DC",
-};
-       
-
-const US_STATE_NAME_TO_ABBR = {
-  alabama: "AL",
-  alaska: "AK",
-  arizona: "AZ",
-  arkansas: "AR",
-  california: "CA",
-  colorado: "CO",
-  connecticut: "CT",
-  delaware: "DE",
-  florida: "FL",
-  georgia: "GA",
-  hawaii: "HI",
-  idaho: "ID",
-  illinois: "IL",
-  indiana: "IN",
-  iowa: "IA",
-  kansas: "KS",
-  kentucky: "KY",
-  louisiana: "LA",
-  maine: "ME",
-  maryland: "MD",
-  massachusetts: "MA",
-  michigan: "MI",
-  minnesota: "MN",
-  mississippi: "MS",
-  missouri: "MO",
-  montana: "MT",
-  nebraska: "NE",
-  nevada: "NV",
-  "new hampshire": "NH",
-  "new jersey": "NJ",
-  "new mexico": "NM",
-  "new york": "NY",
-  "north carolina": "NC",
-  "north dakota": "ND",
-  ohio: "OH",
-  oklahoma: "OK",
-  oregon: "OR",
-  pennsylvania: "PA",
-  "rhode island": "RI",
-  "south carolina": "SC",
-  "south dakota": "SD",
-  tennessee: "TN",
-  texas: "TX",
-  utah: "UT",
-  vermont: "VT",
-  virginia: "VA",
-  washington: "WA",
-  "west virginia": "WV",
-  wisconsin: "WI",
-  wyoming: "WY",
-  "district of columbia": "DC",
-};
-
-const US_STATE_ABBRS = new Set(Object.values(US_STATE_NAME_TO_ABBR));
-
-function parseCityState(locationRaw) {
-  const raw = normalize(locationRaw);
-  if (!raw) return { city: null, state: null };
-
-  // Treat "Remote" as no-state so it won't pollute filters
-  if (/remote/i.test(raw)) return { city: "Remote", state: null };
-
-  // Clean common suffixes
-  const cleaned = raw
-    .replace(/\bUnited States\b/i, "")
-    .replace(/\bUSA\b/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  // Split by commas and inspect from the end (works for full addresses)
-  const parts = cleaned.split(",").map((p) => p.trim()).filter(Boolean);
-
-  // Helper: normalize possible state token
-  const toStateAbbr = (token) => {
-    if (!token) return null;
-    const t = token.trim();
-    // "TX" / "CA"
-    if (/^[A-Z]{2}$/.test(t) && US_STATE_ABBRS.has(t)) return t;
-    // "Texas" / "New York"
-    const lower = t.toLowerCase();
-    return US_STATE_NAME_TO_ABBR[lower] || null;
-  };
-
-  // Walk from end: find state (abbr or full name), then take previous part as city
-  for (let i = parts.length - 1; i >= 0; i--) {
-    // State might be in a token like "Texas 77042" or "TX 78728"
-    const token = parts[i];
-    const tokenWords = token.split(/\s+/);
-
-    // Try last 2 words joined for multi-word states (e.g., "New York")
-    const lastTwo = tokenWords.slice(-2).join(" ").toLowerCase();
-    const lastOne = tokenWords.slice(-1).join(" ").toLowerCase();
-
-    let state =
-      toStateAbbr(tokenWords.slice(-1)[0]?.toUpperCase()) ||
-      US_STATE_NAME_TO_ABBR[lastTwo] ||
-      US_STATE_NAME_TO_ABBR[lastOne];
-
-    // Also handle "TX 78728" where last token is ZIP and previous is state abbr
-    if (!state && tokenWords.length >= 2 && /^\d{5}(-\d{4})?$/.test(tokenWords[tokenWords.length - 1])) {
-      const prev = tokenWords[tokenWords.length - 2].toUpperCase();
-      if (US_STATE_ABBRS.has(prev)) state = prev;
-    }
-
-    if (state) {
-      const city = parts[i - 1] || null;
-
-      // If "city" looks like an address line, keep it but it will be displayed as-is
-      // (better than NULL, and filters will now work because state is correct)
-      return { city, state };
-    }
-  }
-
-  // Fallback: simple "City, ST"
-  if (parts.length >= 2) {
-    const city = parts[0] || null;
-    const state = toStateAbbr(parts[1].toUpperCase());
-    return { city, state };
-  }
-
-  return { city: null, state: null };
-}
-
-
-  // choose a "city" token to the left of the state token
-  // (skip tokens that look like address lines)
-  const isAddressy = (s) =>
-    /\d/.test(s) || /\b(suite|ste|unit|floor|bldg|building|#)\b/i.test(s);
-
-  let city = null;
-
-  // Prefer the closest non-address token to the left
-  for (let i = statePartIndex - 1; i >= 0; i--) {
-    if (!isAddressy(parts[i])) {
-      city = parts[i];
-      break;
-    }
-  }
-
-  // If we still didn't find a city, and we only had "Address, ST 12345"
-  // then we *can't* reliably infer city from that string.
-  return { city: city || null, state };
-}
-
-
-
-
-	// ---- Pay extraction (creates boolean + extracted snippet) ----
-	const payFields = computePayFields({
-	  title,
-	  location: locationRaw ?? "",
-	  content: j?.content ?? "",
-	  description: "", // we already pass content; keep this blank
-	});
+        const { has_pay, pay_extracted } = computePayFields({
+          title,
+          location: locationRaw,
+          content: j?.content,
+        });
 
         const fingerprint = buildFingerprint({
           source: "greenhouse",
@@ -437,35 +252,30 @@ function parseCityState(locationRaw) {
           url: jobUrl,
         });
 
-       
-
-	 rows.push({
+        rows.push({
           source: "greenhouse",
           source_job_id: sourceJobId,
           source_company: companySlug,
 
-       title,
-  company: companySlug,
-  location_raw: locationRaw,
-  location_city: city,
-  location_state: state,
-  
-  employment_type: null,
-  job_type: null,
+          title,
+          company: companySlug,
 
-  url: jobUrl,
-  description: normalize(j?.content) || null,
-  posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
+          location_raw: locationRaw,
+          location_city: city,
+          location_state: state,
 
-  // ✅ add these
-  has_pay,
-  pay_extracted,
+          employment_type: null,
+          job_type: null,
 
+          url: jobUrl,
+          description: normalize(j?.content) || null,
+          posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
 
+          has_pay,
+          pay_extracted,
 
           fingerprint,
 
-          // cleanup support
           is_active: true,
           last_seen_at: runIso,
         });
@@ -480,21 +290,17 @@ function parseCityState(locationRaw) {
       await upsertJobs(rows);
       totalUpserted += rows.length;
 
-      // mark stale inactive after upsert
       await markStaleInactive(companySlug, runIso);
 
       console.log(`[DONE] ${companySlug}: upserted ${rows.length}, filtered ${jobs.length - rows.length}`);
     } catch (e) {
       totalErrors += 1;
+      const msg = e?.message ? e.message : String(e);
 
-      const msg = (e && e.message) ? e.message : String(e);
-      // Common cases:
-      // - 404 means "not a greenhouse board slug"
-      // - HTML returned means slug isn't boards-api compatible (or blocked)
       if (msg.includes("HTTP 404")) {
         console.log(`[SKIP] ${companySlug} -> HTTP 404 (not a Greenhouse board slug)`);
       } else if (msg.includes("Unexpected token") || msg.includes("not valid JSON")) {
-        console.log(`[ERR]  ${companySlug}: returned non-JSON (likely not a valid boards-api slug)`);
+        console.log(`[ERR]  ${companySlug}: returned non-JSON (likely invalid slug)`);
       } else {
         console.log(`[ERR]  ${companySlug}: ${msg}`);
       }
