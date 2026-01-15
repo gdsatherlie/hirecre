@@ -285,6 +285,11 @@ export default function BoardPage() {
   const router = useRouter();
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const [savingSearch, setSavingSearch] = useState(false);
+  const [saveSearchMsg, setSaveSearchMsg] = useState<string>("");
+
 
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -313,17 +318,20 @@ export default function BoardPage() {
 
   // ----- Auth gate -----
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const email = data.session?.user?.email ?? null;
+  (async () => {
+    const { data } = await supabase.auth.getSession();
+    const email = data.session?.user?.email ?? null;
+    const uid = data.session?.user?.id ?? null;
 
-      if (!email) {
-        router.push("/login");
-        return;
-      }
-      setUserEmail(email);
-    })();
-  }, [router]);
+    if (!email || !uid) {
+      router.push("/login");
+      return;
+    }
+
+    setUserEmail(email);
+    setUserId(uid);
+  })();
+}, [router]);
 
 useEffect(() => {
   // Read last visit timestamp (if any)
@@ -456,6 +464,74 @@ try {
   }, [q, company, state, source, remoteOnly, payOnly, page]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
+
+async function saveThisSearch() {
+  if (!userId || !userEmail) {
+    setSaveSearchMsg("You must be logged in to save searches.");
+    return;
+  }
+
+  setSavingSearch(true);
+  setSaveSearchMsg("");
+
+  try {
+    const payload = {
+      user_id: userId,
+      subscriber_email: userEmail,
+      q: q.trim() ? q.trim() : null,
+      state: state !== "ALL" ? state : null,
+      company: company !== "ALL" ? company : null,
+      source: source !== "ALL" ? source : null,
+      remote_only: remoteOnly,
+      pay_only: payOnly,
+      is_enabled: true,
+    };
+
+    // Prevent duplicate saved searches
+    let dupeQuery = supabase
+      .from("saved_searches")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("remote_only", remoteOnly)
+      .eq("pay_only", payOnly)
+      .limit(1);
+
+    // q
+    if (payload.q === null) dupeQuery = dupeQuery.is("q", null);
+    else dupeQuery = dupeQuery.eq("q", payload.q);
+
+    // state
+    if (payload.state === null) dupeQuery = dupeQuery.is("state", null);
+    else dupeQuery = dupeQuery.eq("state", payload.state);
+
+    // company
+    if (payload.company === null) dupeQuery = dupeQuery.is("company", null);
+    else dupeQuery = dupeQuery.eq("company", payload.company);
+
+    // source
+    if (payload.source === null) dupeQuery = dupeQuery.is("source", null);
+    else dupeQuery = dupeQuery.eq("source", payload.source);
+
+    const { data: dupeRows, error: dupeErr } = await dupeQuery;
+
+    if (dupeErr) throw dupeErr;
+
+    if (dupeRows && dupeRows.length > 0) {
+      setSaveSearchMsg("This search is already saved.");
+      return;
+    }
+
+    const { error: insErr } = await supabase.from("saved_searches").insert(payload);
+    if (insErr) throw insErr;
+
+    setSaveSearchMsg("Saved! Manage alerts at /alerts.");
+  } catch (e: any) {
+    setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
+  } finally {
+    setSavingSearch(false);
+  }
+}
+
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -632,9 +708,16 @@ async function saveThisSearch() {
               >
                 Clear filters
               </button>
-            </div>
-          </div>
-        </div>
+
+<button
+  type="button"
+  onClick={saveThisSearch}
+  disabled={savingSearch}
+  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+>
+  {savingSearch ? "Saving..." : "Save this search"}
+</button>
+
 
 <button
   type="button"
@@ -643,6 +726,16 @@ async function saveThisSearch() {
 >
   Save this search
 </button>
+            </div>
+          </div>
+        </div>
+
+{saveSearchMsg ? (
+  <div className="mt-3 text-sm text-gray-700">
+    {saveSearchMsg}
+  </div>
+) : null}
+
 
 
         {/* Results */}
