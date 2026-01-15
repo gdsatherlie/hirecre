@@ -460,15 +460,24 @@ try {
 } catch {}
 
 
-    })();
-  }, [q, company, state, source, remoteOnly, payOnly, page]);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
 
 async function saveThisSearch() {
-  if (!userId || !userEmail) {
-    setSaveSearchMsg("You must be logged in to save searches.");
-    return;
+  const { error } = await supabase.from("saved_searches").insert({
+  user_id: user.id,
+  user_email: user.email,
+  name: name.trim(),
+  filters: {
+    q: q.trim(),
+    company,
+    state,
+    source,
+    remoteOnly,
+    payOnly,
+  },
+  is_enabled: true,
+});
+
   }
 
   setSavingSearch(true);
