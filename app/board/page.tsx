@@ -574,7 +574,7 @@ export default function BoardPage() {
                 const location = fmtLocation(job);
                 const posted = fmtDate(job.posted_at);
                 const remote = isRemote(job);
-                const emp = employmentTag(job);
+                
 
                 const pay =
                   (job.pay ?? "").toString().trim() ||
@@ -618,7 +618,6 @@ export default function BoardPage() {
 
                         <div className="mt-3 flex flex-wrap gap-2">
                           {remote && <Pill>Remote</Pill>}
-                          {emp && <Pill>{emp}</Pill>}
                           {job.job_type && <Pill>{job.job_type}</Pill>}
                           {job.employment_type && <Pill>{job.employment_type}</Pill>}
                           <Pill>{sourceLabel}</Pill>
