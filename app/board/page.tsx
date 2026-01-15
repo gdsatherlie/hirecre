@@ -266,12 +266,19 @@ function extractPay(job: Job): string | null {
   return m ? m[0].replace(/\s+/g, " ").trim() : null;
 }
 
-function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700">
-      {children}
-    </span>
-  );
+function Pill({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "blue";
+}) {
+  const cls =
+    tone === "blue"
+      ? "inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800"
+      : "inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700";
+
+  return <span className={cls}>{children}</span>;
 }
 
 export default function BoardPage() {
@@ -282,6 +289,10 @@ export default function BoardPage() {
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [count, setCount] = useState<number>(0);
+
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
+  const [seenReady, setSeenReady] = useState(false);
+
 
   // Facets
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
@@ -313,6 +324,19 @@ export default function BoardPage() {
       setUserEmail(email);
     })();
   }, [router]);
+
+useEffect(() => {
+  // Read last visit timestamp (if any)
+  try {
+    const v = localStorage.getItem("hirecre:lastSeenBoard");
+    setLastSeen(v);
+  } catch {
+    setLastSeen(null);
+  } finally {
+    setSeenReady(true);
+  }
+}, []);
+
 
   // ----- Load facet options once -----
   useEffect(() => {
@@ -421,6 +445,13 @@ export default function BoardPage() {
       } finally {
         setLoading(false);
       }
+
+// Update last seen timestamp for next visit (only after successful fetch)
+try {
+  localStorage.setItem("hirecre:lastSeenBoard", new Date().toISOString());
+} catch {}
+
+
     })();
   }, [q, company, state, source, remoteOnly, payOnly, page]);
 
@@ -574,7 +605,16 @@ export default function BoardPage() {
                 const location = fmtLocation(job);
                 const posted = fmtDate(job.posted_at);
                 const remote = isRemote(job);
-                
+                const posted = fmtDate(job.posted_at);
+		let isNew = false;
+if (seenReady && lastSeen && job.posted_at) {
+  try {
+    isNew = new Date(job.posted_at).getTime() > new Date(lastSeen).getTime();
+  } catch {
+    isNew = false;
+  }
+}
+
 
                 const pay =
                   (job.pay ?? "").toString().trim() ||
@@ -617,7 +657,8 @@ export default function BoardPage() {
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {remote && <Pill>Remote</Pill>}
+                          {isNew && <Pill tone="blue">New</Pill>}
+			  {remote && <Pill>Remote</Pill>}
                           {job.job_type && <Pill>{job.job_type}</Pill>}
                           {job.employment_type && <Pill>{job.employment_type}</Pill>}
                           <Pill>{sourceLabel}</Pill>
