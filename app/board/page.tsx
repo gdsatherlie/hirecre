@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import EmailSignup from "@/components/EmailSignup";
 import { createClient } from "@supabase/supabase-js";
@@ -44,12 +44,9 @@ const supabase = createClient(
 );
 
 // If you want to hard-fix some “slugs” into display names:
-// If you want to hard-fix some “slugs” into display names:
 const COMPANY_OVERRIDES: Record<string, string> = {
   bgeinc: "BGE, Inc.",
   homelight: "HomeLight",
-
-  // add more overrides here as you notice them
   thesciongroupllc: "The Scion Group",
   oldsecondnationalbank: "Old Second National Bank",
 };
@@ -109,20 +106,35 @@ const US_STATES: Record<string, string> = {
   "DISTRICT OF COLUMBIA": "DC",
 };
 
+function normalizeState(input?: string | null): string {
+  if (!input) return "";
+  const s = input.trim();
+  if (!s) return "";
+  if (s.length === 2) return s.toUpperCase();
+
+  const key = s.toUpperCase();
+  if (US_STATES[key]) return US_STATES[key];
+
+  const first = key.split(",")[0]?.trim() ?? key;
+  if (US_STATES[first]) return US_STATES[first];
+
+  return s;
+}
+
 function unslugCompany(input: string): string {
   let s = (input || "").trim();
   if (!s) return s;
 
-  // Already has spaces? leave it
+  // already readable (has spaces)
   if (/\s/.test(s)) return s;
 
-  // Convert separators to spaces if present
+  // separators -> spaces
   s = s.replace(/[-_]+/g, " ");
 
-  // Pull common suffixes off the end (thesciongroupllc -> thesciongroup llc)
+  // split common suffixes at end
   s = s.replace(/(.*?)(llc|inc|ltd|lp|llp|reit|plc)$/i, "$1 $2").trim();
 
-  // If still no spaces, do a light dictionary-based split
+  // dictionary split if still one token
   if (!/\s/.test(s)) {
     const words = [
       "national",
@@ -148,6 +160,8 @@ function unslugCompany(input: string): string {
       "lending",
       "trust",
       "credit",
+      "second",
+      "scion",
     ];
 
     let lower = s.toLowerCase();
@@ -164,13 +178,13 @@ function titleCaseCompany(input: string): string {
   const trimmed = (input || "").trim();
   if (!trimmed) return trimmed;
 
-  // Overrides first
-  const key = trimmed.toLowerCase().replace(/\s+/g, "");
-  if (COMPANY_OVERRIDES[key]) return COMPANY_OVERRIDES[key];
+  // overrides first (key strips spaces)
+  const overrideKey = trimmed.toLowerCase().replace(/\s+/g, "");
+  if (COMPANY_OVERRIDES[overrideKey]) return COMPANY_OVERRIDES[overrideKey];
 
   const cleaned = unslugCompany(trimmed);
 
-  // If already mixed case, keep it (after unslug)
+  // if already mixed case, keep it (after unslug)
   const hasUpper = /[A-Z]/.test(cleaned);
   const hasLower = /[a-z]/.test(cleaned);
   if (hasUpper && hasLower) return cleaned;
@@ -185,61 +199,8 @@ function titleCaseCompany(input: string): string {
       if (acronyms.has(up)) return up;
       if (w.length <= 2) return up;
       return w[0].toUpperCase() + w.slice(1);
-    }
-    .join(" ");
-}
-
-  // ✅ use overrides FIRST (works for any special cases)
-  const overrideKey = trimmed.toLowerCase().replace(/\s+/g, "");
-  if (COMPANY_OVERRIDES[overrideKey]) return COMPANY_OVERRIDES[overrideKey];
-
-const COMPANY_OVERRIDES: Record<string, string> = {
-  bgeinc: "BGE, Inc.",
-  homelight: "HomeLight",
-
-  // ✅ add these
-  thesciongroupllc: "The Scion Group",
-  oldsecondnationalbank: "Old Second National Bank",
-
-
-
-  // ✅ try to “unslug” if no spaces
-  const deSlugged = unslugCompany(trimmed);
-
-  // If it has upper+lower already, keep as-is (after unslug)
-  const hasUpper = /[A-Z]/.test(deSlugged);
-  const hasLower = /[a-z]/.test(deSlugged);
-  if (hasUpper && hasLower) return deSlugged;
-
-
-
-  const acronyms = new Set(["LLC", "LP", "LLP", "REIT", "CRE", "USA", "US", "IT"]);
-  return deSlugged
-    .toLowerCase()
-    .split(/[\s/.-]+/)
-    .map((w) => {
-      if (!w) return w;
-      const up = w.toUpperCase();
-      if (acronyms.has(up)) return up;
-      if (w.length <= 2) return up;
-      return w[0].toUpperCase() + w.slice(1);
     })
     .join(" ");
-}
-
-function normalizeState(input?: string | null): string {
-  if (!input) return "";
-  const s = input.trim();
-  if (!s) return "";
-  if (s.length === 2) return s.toUpperCase();
-
-  const key = s.toUpperCase();
-  if (US_STATES[key]) return US_STATES[key];
-
-  const first = key.split(",")[0]?.trim() ?? key;
-  if (US_STATES[first]) return US_STATES[first];
-
-  return s;
 }
 
 function fmtDate(d?: string | null) {
@@ -330,7 +291,7 @@ export default function BoardPage() {
   // Filters
   const [q, setQ] = useState("");
   const [company, setCompany] = useState<string>("ALL");
-  const [state, setState] = useState<string>("ALL"); // <-- dropdown uses this
+  const [state, setState] = useState<string>("ALL");
   const [source, setSource] = useState<string>("ALL");
   const [remoteOnly, setRemoteOnly] = useState<boolean>(false);
   const [payOnly, setPayOnly] = useState(false);
@@ -374,7 +335,7 @@ export default function BoardPage() {
         for (const r of rows) {
           if (r.company) companies.add(titleCaseCompany(r.company));
           const st = normalizeState(r.location_state);
-          if (st && st.length === 2) states.add(st); // keep only proper abbreviations
+          if (st && st.length === 2) states.add(st);
           if (r.source) sources.add(String(r.source).toLowerCase());
         }
 
@@ -406,7 +367,6 @@ export default function BoardPage() {
 
         const qq = q.trim();
         if (qq) {
-          // use ilike search across fields, but DO NOT let this break state filtering
           const esc = qq.replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/,/g, "\\,");
           query = query.or(
             [
@@ -424,9 +384,7 @@ export default function BoardPage() {
           query = query.ilike("company", `%${company}%`);
         }
 
-        // ✅✅✅ FIXED STATE FILTER:
-        // Only filter using the normalized 2-letter abbreviation stored in location_state.
-        // No OR. No location_raw. No ilike.
+        // ✅ State filter ONLY uses location_state exact match
         if (state !== "ALL") {
           query = query.eq("location_state", state);
         }
@@ -446,15 +404,12 @@ export default function BoardPage() {
         }
 
         if (payOnly) {
-          // Use DB boolean first (fast + consistent)
           query = query.eq("has_pay", true);
         }
 
         const from = (page - 1) * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
-        // Keep your payOnly special-mode pagination if you want,
-        // but it’s no longer needed now that has_pay is used.
         const { data, error, count: c } = await query.range(from, to);
         if (error) throw error;
 
