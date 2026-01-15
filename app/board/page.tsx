@@ -538,52 +538,6 @@ async function saveThisSearch() {
     router.push("/login");
   }
 
-async function saveThisSearch() {
-  // 1) must be logged in
-  const { data } = await supabase.auth.getSession();
-  const user = data.session?.user;
-  if (!user?.id || !user?.email) {
-    alert("You must be signed in to save searches.");
-    return;
-  }
-
-  // 2) Ask for a name
-  const defaultNameParts = [];
-  if (state !== "ALL") defaultNameParts.push(state);
-  if (company !== "ALL") defaultNameParts.push(company);
-  if (remoteOnly) defaultNameParts.push("Remote");
-  if (payOnly) defaultNameParts.push("Pay");
-  const defaultName = defaultNameParts.length ? defaultNameParts.join(" • ") : "My search";
-
-  const name = window.prompt("Name this search:", defaultName);
-  if (!name) return;
-
-  // 3) Store filters
-  const filters = {
-    q,
-    company,
-    state,
-    source,
-    remoteOnly,
-    payOnly,
-  };
-
-  const { error } = await supabase.from("saved_searches").insert({
-    user_id: user.id,
-    user_email: user.email,
-    name: name.trim(),
-    filters,
-    is_enabled: true,
-  });
-
-  if (error) {
-    console.error(error);
-    alert(error.message || "Failed to save search.");
-    return;
-  }
-
-  alert("Saved! You’ll get alerts when new jobs match this search.");
-}
 
 
   return (
@@ -719,13 +673,7 @@ async function saveThisSearch() {
 </button>
 
 
-<button
-  type="button"
-  onClick={saveThisSearch}
-  className="text-sm font-semibold text-blue-700 hover:underline"
->
-  Save this search
-</button>
+
             </div>
           </div>
         </div>
@@ -808,8 +756,6 @@ if (seenReady && lastSeen && job.posted_at) {
                         <div className="mt-3 flex flex-wrap gap-2">
                           {isNew && <Pill tone="blue">New</Pill>}
 			  {remote && <Pill>Remote</Pill>}
-                          {job.job_type && <Pill>{job.job_type}</Pill>}
-                          {job.employment_type && <Pill>{job.employment_type}</Pill>}
                           <Pill>{sourceLabel}</Pill>
                           {pay ? <Pill>Pay: {pay}</Pill> : null}
                         </div>
