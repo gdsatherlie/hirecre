@@ -462,6 +462,54 @@ try {
     router.push("/login");
   }
 
+async function saveThisSearch() {
+  // 1) must be logged in
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (!user?.id || !user?.email) {
+    alert("You must be signed in to save searches.");
+    return;
+  }
+
+  // 2) Ask for a name
+  const defaultNameParts = [];
+  if (state !== "ALL") defaultNameParts.push(state);
+  if (company !== "ALL") defaultNameParts.push(company);
+  if (remoteOnly) defaultNameParts.push("Remote");
+  if (payOnly) defaultNameParts.push("Pay");
+  const defaultName = defaultNameParts.length ? defaultNameParts.join(" • ") : "My search";
+
+  const name = window.prompt("Name this search:", defaultName);
+  if (!name) return;
+
+  // 3) Store filters
+  const filters = {
+    q,
+    company,
+    state,
+    source,
+    remoteOnly,
+    payOnly,
+  };
+
+  const { error } = await supabase.from("saved_searches").insert({
+    user_id: user.id,
+    user_email: user.email,
+    name: name.trim(),
+    filters,
+    is_enabled: true,
+  });
+
+  if (error) {
+    console.error(error);
+    alert(error.message || "Failed to save search.");
+    return;
+  }
+
+  alert("Saved! You’ll get alerts when new jobs match this search.");
+}
+
+
   return (
     <div className="min-h-[calc(100vh-120px)] bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -587,6 +635,15 @@ try {
             </div>
           </div>
         </div>
+
+<button
+  type="button"
+  onClick={saveThisSearch}
+  className="text-sm font-semibold text-blue-700 hover:underline"
+>
+  Save this search
+</button>
+
 
         {/* Results */}
         <div className="mt-6">
