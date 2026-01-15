@@ -18,7 +18,7 @@ type Job = {
   location_state?: string | null;
   location_raw?: string | null;
 
-  // tags
+  // tags (kept in type for DB compatibility, but we do not display pills)
   job_type?: string | null;
   employment_type?: string | null;
 
@@ -27,11 +27,11 @@ type Job = {
   posted_at?: string | null;
   description?: string | null;
 
-  // pay (DB fields you actually use)
+  // pay
   has_pay: boolean | null;
   pay_extracted: string | null;
 
-  // optional legacy fields (ok if null / not present)
+  // optional legacy fields
   pay?: string | null;
   pay_text?: string | null;
   salary?: string | null;
@@ -221,20 +221,6 @@ function isRemote(job: Job): boolean {
   return hay.includes("remote");
 }
 
-function employmentTag(job: Job): string | null {
-  const raw = `${job.title ?? ""}\n${job.description ?? ""}`;
-  const t = raw
-    .toLowerCase()
-    .replace(/\u00a0/g, " ")
-    .replace(/[\u2010-\u2015\u2212\u00ad]/g, "-");
-
-  if (t.includes("part-time") || t.includes("part time")) return "Part-time";
-  if (t.includes("full-time") || t.includes("full time")) return "Full-time";
-  if (t.includes("contract")) return "Contract";
-  if (t.includes("intern")) return "Internship";
-  return null;
-}
-
 function fmtLocation(job: Job): string {
   const city = (job.location_city ?? "").trim();
   const state = normalizeState(job.location_state);
@@ -290,14 +276,12 @@ export default function BoardPage() {
   const [savingSearch, setSavingSearch] = useState(false);
   const [saveSearchMsg, setSaveSearchMsg] = useState<string>("");
 
-
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [count, setCount] = useState<number>(0);
 
   const [lastSeen, setLastSeen] = useState<string | null>(null);
   const [seenReady, setSeenReady] = useState(false);
-
 
   // Facets
   const [companyOptions, setCompanyOptions] = useState<string[]>([]);
@@ -318,33 +302,32 @@ export default function BoardPage() {
 
   // ----- Auth gate -----
   useEffect(() => {
-  (async () => {
-    const { data } = await supabase.auth.getSession();
-    const email = data.session?.user?.email ?? null;
-    const uid = data.session?.user?.id ?? null;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const email = data.session?.user?.email ?? null;
+      const uid = data.session?.user?.id ?? null;
 
-    if (!email || !uid) {
-      router.push("/login");
-      return;
+      if (!email || !uid) {
+        router.push("/login");
+        return;
+      }
+
+      setUserEmail(email);
+      setUserId(uid);
+    })();
+  }, [router]);
+
+  useEffect(() => {
+    // Read last visit timestamp (if any)
+    try {
+      const v = localStorage.getItem("hirecre:lastSeenBoard");
+      setLastSeen(v);
+    } catch {
+      setLastSeen(null);
+    } finally {
+      setSeenReady(true);
     }
-
-    setUserEmail(email);
-    setUserId(uid);
-  })();
-}, [router]);
-
-useEffect(() => {
-  // Read last visit timestamp (if any)
-  try {
-    const v = localStorage.getItem("hirecre:lastSeenBoard");
-    setLastSeen(v);
-  } catch {
-    setLastSeen(null);
-  } finally {
-    setSeenReady(true);
-  }
-}, []);
-
+  }, []);
 
   // ----- Load facet options once -----
   useEffect(() => {
@@ -413,6 +396,7 @@ useEffect(() => {
         }
 
         if (company !== "ALL") {
+          // company dropdown values are display-normalized; do an ilike match
           query = query.ilike("company", `%${company}%`);
         }
 
@@ -454,100 +438,82 @@ useEffect(() => {
         setLoading(false);
       }
 
-// Update last seen timestamp for next visit (only after successful fetch)
-try {
-  localStorage.setItem("hirecre:lastSeenBoard", new Date().toISOString());
-} catch {}
+      // Update last seen timestamp for next visit (only after successful fetch)
+      try {
+        localStorage.setItem("hirecre:lastSeenBoard", new Date().toISOString());
+      } catch {}
+    })();
+  }, [q, company, state, source, remoteOnly, payOnly, page]);
 
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
 
-
-
-async function saveThisSearch() {
-  const { error } = await supabase.from("saved_searches").insert({
-  user_id: user.id,
-  user_email: user.email,
-  name: name.trim(),
-  filters: {
-    q: q.trim(),
-    company,
-    state,
-    source,
-    remoteOnly,
-    payOnly,
-  },
-  is_enabled: true,
-});
-
-  }
-
-  setSavingSearch(true);
-  setSaveSearchMsg("");
-
-  try {
-    const payload = {
-      user_id: userId,
-      subscriber_email: userEmail,
-      q: q.trim() ? q.trim() : null,
-      state: state !== "ALL" ? state : null,
-      company: company !== "ALL" ? company : null,
-      source: source !== "ALL" ? source : null,
-      remote_only: remoteOnly,
-      pay_only: payOnly,
-      is_enabled: true,
-    };
-
-    // Prevent duplicate saved searches
-    let dupeQuery = supabase
-      .from("saved_searches")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("remote_only", remoteOnly)
-      .eq("pay_only", payOnly)
-      .limit(1);
-
-    // q
-    if (payload.q === null) dupeQuery = dupeQuery.is("q", null);
-    else dupeQuery = dupeQuery.eq("q", payload.q);
-
-    // state
-    if (payload.state === null) dupeQuery = dupeQuery.is("state", null);
-    else dupeQuery = dupeQuery.eq("state", payload.state);
-
-    // company
-    if (payload.company === null) dupeQuery = dupeQuery.is("company", null);
-    else dupeQuery = dupeQuery.eq("company", payload.company);
-
-    // source
-    if (payload.source === null) dupeQuery = dupeQuery.is("source", null);
-    else dupeQuery = dupeQuery.eq("source", payload.source);
-
-    const { data: dupeRows, error: dupeErr } = await dupeQuery;
-
-    if (dupeErr) throw dupeErr;
-
-    if (dupeRows && dupeRows.length > 0) {
-      setSaveSearchMsg("This search is already saved.");
+  // ✅ ONE saveThisSearch function (not inside any useEffect)
+  async function saveThisSearch() {
+    if (!userId || !userEmail) {
+      setSaveSearchMsg("You must be logged in to save searches.");
       return;
     }
 
-    const { error: insErr } = await supabase.from("saved_searches").insert(payload);
-    if (insErr) throw insErr;
+    setSavingSearch(true);
+    setSaveSearchMsg("");
 
-    setSaveSearchMsg("Saved! Manage alerts at /alerts.");
-  } catch (e: any) {
-    setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
-  } finally {
-    setSavingSearch(false);
+    try {
+      const payload = {
+        user_id: userId,
+        subscriber_email: userEmail,
+        q: q.trim() ? q.trim() : null,
+        state: state !== "ALL" ? state : null,
+        company: company !== "ALL" ? company : null,
+        source: source !== "ALL" ? source : null,
+        remote_only: remoteOnly,
+        pay_only: payOnly,
+        is_enabled: true,
+      };
+
+      // Prevent duplicate saved searches
+      let dupeQuery = supabase
+        .from("saved_searches")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("remote_only", remoteOnly)
+        .eq("pay_only", payOnly)
+        .limit(1);
+
+      if (payload.q === null) dupeQuery = dupeQuery.is("q", null);
+      else dupeQuery = dupeQuery.eq("q", payload.q);
+
+      if (payload.state === null) dupeQuery = dupeQuery.is("state", null);
+      else dupeQuery = dupeQuery.eq("state", payload.state);
+
+      if (payload.company === null) dupeQuery = dupeQuery.is("company", null);
+      else dupeQuery = dupeQuery.eq("company", payload.company);
+
+      if (payload.source === null) dupeQuery = dupeQuery.is("source", null);
+      else dupeQuery = dupeQuery.eq("source", payload.source);
+
+      const { data: dupeRows, error: dupeErr } = await dupeQuery;
+      if (dupeErr) throw dupeErr;
+
+      if (dupeRows && dupeRows.length > 0) {
+        setSaveSearchMsg("This search is already saved.");
+        return;
+      }
+
+      const { error: insErr } = await supabase.from("saved_searches").insert(payload);
+      if (insErr) throw insErr;
+
+      setSaveSearchMsg("Saved! Alerts will email you when new jobs match.");
+    } catch (e: any) {
+      setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setSavingSearch(false);
+    }
   }
-}
-
 
   async function signOut() {
     await supabase.auth.signOut();
     router.push("/login");
   }
-
-
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-gray-50">
@@ -672,28 +638,21 @@ async function saveThisSearch() {
                 Clear filters
               </button>
 
-<button
-  type="button"
-  onClick={saveThisSearch}
-  disabled={savingSearch}
-  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
->
-  {savingSearch ? "Saving..." : "Save this search"}
-</button>
-
-
-
+              <button
+                type="button"
+                onClick={saveThisSearch}
+                disabled={savingSearch}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingSearch ? "Saving..." : "Save this search"}
+              </button>
             </div>
           </div>
         </div>
 
-{saveSearchMsg ? (
-  <div className="mt-3 text-sm text-gray-700">
-    {saveSearchMsg}
-  </div>
-) : null}
-
-
+        {saveSearchMsg ? (
+          <div className="mt-3 text-sm text-gray-700">{saveSearchMsg}</div>
+        ) : null}
 
         {/* Results */}
         <div className="mt-6">
@@ -712,15 +671,17 @@ async function saveThisSearch() {
                 const location = fmtLocation(job);
                 const remote = isRemote(job);
                 const posted = fmtDate(job.posted_at);
-		let isNew = false;
-if (seenReady && lastSeen && job.posted_at) {
-  try {
-    isNew = new Date(job.posted_at).getTime() > new Date(lastSeen).getTime();
-  } catch {
-    isNew = false;
-  }
-}
 
+                let isNew = false;
+                if (seenReady && lastSeen && job.posted_at) {
+                  try {
+                    isNew =
+                      new Date(job.posted_at).getTime() >
+                      new Date(lastSeen).getTime();
+                  } catch {
+                    isNew = false;
+                  }
+                }
 
                 const pay =
                   (job.pay ?? "").toString().trim() ||
@@ -764,7 +725,7 @@ if (seenReady && lastSeen && job.posted_at) {
 
                         <div className="mt-3 flex flex-wrap gap-2">
                           {isNew && <Pill tone="blue">New</Pill>}
-			  {remote && <Pill>Remote</Pill>}
+                          {remote && <Pill>Remote</Pill>}
                           <Pill>{sourceLabel}</Pill>
                           {pay ? <Pill>Pay: {pay}</Pill> : null}
                         </div>
