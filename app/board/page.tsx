@@ -603,7 +603,6 @@ try {
               {jobs.map((job) => {
                 const companyName = titleCaseCompany(job.company ?? "");
                 const location = fmtLocation(job);
-                const posted = fmtDate(job.posted_at);
                 const remote = isRemote(job);
                 const posted = fmtDate(job.posted_at);
 		let isNew = false;
