@@ -44,9 +44,14 @@ const supabase = createClient(
 );
 
 // If you want to hard-fix some “slugs” into display names:
+// If you want to hard-fix some “slugs” into display names:
 const COMPANY_OVERRIDES: Record<string, string> = {
   bgeinc: "BGE, Inc.",
   homelight: "HomeLight",
+
+  // add more overrides here as you notice them
+  thesciongroupllc: "The Scion Group",
+  oldsecondnationalbank: "Old Second National Bank",
 };
 
 // US state full name -> abbreviation
@@ -108,26 +113,17 @@ function unslugCompany(input: string): string {
   let s = (input || "").trim();
   if (!s) return s;
 
-  // If it already contains spaces, don’t touch it
+  // Already has spaces? leave it
   if (/\s/.test(s)) return s;
 
-  // Convert separators to spaces (if any)
+  // Convert separators to spaces if present
   s = s.replace(/[-_]+/g, " ");
 
-  // If it looks like a domain/company slug, insert spaces before:
-  // - transitions from lower->upper (rare here)
-  // - common suffixes and abbreviations
-  // - "llc", "inc", etc.
-  s = s
-    // thesciongroupLLC -> thesciongroup LLC
-    .replace(/(llc|inc|ltd|lp|llp|reit|plc)$/i, " $1")
-    // ...and if it’s embedded like thesciongroupllc
-    .replace(/(.*?)(llc|inc|ltd|lp|llp|reit|plc)$/i, "$1 $2");
+  // Pull common suffixes off the end (thesciongroupllc -> thesciongroup llc)
+  s = s.replace(/(.*?)(llc|inc|ltd|lp|llp|reit|plc)$/i, "$1 $2").trim();
 
-  // If it still has no spaces, do a “best effort” word split.
-  // This won’t be perfect for every company, but it helps a lot.
+  // If still no spaces, do a light dictionary-based split
   if (!/\s/.test(s)) {
-    // Insert spaces before common word boundaries using a small dictionary
     const words = [
       "national",
       "bank",
@@ -142,12 +138,9 @@ function unslugCompany(input: string): string {
       "investment",
       "management",
       "advisors",
-      "adviser",
       "services",
-      "service",
       "financial",
       "holdings",
-      "holding",
       "solutions",
       "development",
       "commercial",
@@ -157,10 +150,8 @@ function unslugCompany(input: string): string {
       "credit",
     ];
 
-    // Try to break the slug by inserting spaces around known words
     let lower = s.toLowerCase();
     for (const w of words) {
-      // add spaces around known words if they appear
       lower = lower.replace(new RegExp(w, "g"), ` ${w} `);
     }
     s = lower.replace(/\s+/g, " ").trim();
@@ -170,8 +161,33 @@ function unslugCompany(input: string): string {
 }
 
 function titleCaseCompany(input: string): string {
-  const trimmed = input.trim();
+  const trimmed = (input || "").trim();
   if (!trimmed) return trimmed;
+
+  // Overrides first
+  const key = trimmed.toLowerCase().replace(/\s+/g, "");
+  if (COMPANY_OVERRIDES[key]) return COMPANY_OVERRIDES[key];
+
+  const cleaned = unslugCompany(trimmed);
+
+  // If already mixed case, keep it (after unslug)
+  const hasUpper = /[A-Z]/.test(cleaned);
+  const hasLower = /[a-z]/.test(cleaned);
+  if (hasUpper && hasLower) return cleaned;
+
+  const acronyms = new Set(["LLC", "LP", "LLP", "REIT", "CRE", "USA", "US", "IT"]);
+  return cleaned
+    .toLowerCase()
+    .split(/[\s/.-]+/)
+    .map((w) => {
+      if (!w) return w;
+      const up = w.toUpperCase();
+      if (acronyms.has(up)) return up;
+      if (w.length <= 2) return up;
+      return w[0].toUpperCase() + w.slice(1);
+    })
+    .join(" ");
+}
 
   // ✅ use overrides FIRST (works for any special cases)
   const overrideKey = trimmed.toLowerCase().replace(/\s+/g, "");
