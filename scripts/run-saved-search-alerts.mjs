@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
-const ALERT_FROM_EMAIL = process.env.ALERT_FROM_EMAIL;
-const ALERT_FROM_NAME = process.env.ALERT_FROM_NAME || "HireCRE";
+const SUPABASE_URL = mustEnv("SUPABASE_URL", ["NEXT_PUBLIC_SUPABASE_URL"]);
+const SUPABASE_SERVICE_ROLE_KEY = mustEnv("SUPABASE_SERVICE_ROLE_KEY");
+const MAILERLITE_API_TOKEN = mustEnv("MAILERLITE_API_TOKEN");
 
 const APP_BASE_URL = process.env.APP_BASE_URL || "https://YOUR_DOMAIN.com"; // set this in env if you want
 
@@ -23,6 +22,17 @@ if (!MAILERSEND_API_KEY || !ALERT_FROM_EMAIL) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
+
+
+function mustEnv(name, fallbacks = []) {
+  const keys = [name, ...fallbacks];
+  for (const k of keys) {
+    const v = process.env[k];
+    if (v && String(v).trim()) return String(v).trim();
+  }
+  throw new Error(`Missing required env var: ${keys.join(" or ")}`);
+}
+
 
 function buildBoardLink(filters) {
   const p = new URLSearchParams();
