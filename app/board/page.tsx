@@ -184,7 +184,7 @@ const COMPANY_OVERRIDES: Record<string, string> = {
   // ✅ add these
   thesciongroupllc: "The Scion Group",
   oldsecondnationalbank: "Old Second National Bank",
-};
+
 
 
   // ✅ try to “unslug” if no spaces
