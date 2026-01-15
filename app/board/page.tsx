@@ -1,116 +1,37 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import EmailSignup from "@/components/EmailSignup";
 import { createClient } from "@supabase/supabase-js";
 
 type Job = {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   id: string;
-  source?: string | null;
 
+  // core
+  source: string | null;
   title: string | null;
   company: string | null;
 
+  // location
   location_city?: string | null;
   location_state?: string | null;
   location_raw?: string | null;
 
+  // tags
   job_type?: string | null;
   employment_type?: string | null;
 
+  // link/content
   url: string | null;
   posted_at?: string | null;
-
   description?: string | null;
 
-  // Pay fields (some may not exist in your DB, that's OK)
+  // pay (DB fields you actually use)
+  has_pay: boolean | null;
+  pay_extracted: string | null;
+
+  // optional legacy fields (ok if null / not present)
   pay?: string | null;
   pay_text?: string | null;
   salary?: string | null;
@@ -126,7 +47,6 @@ const supabase = createClient(
 const COMPANY_OVERRIDES: Record<string, string> = {
   bgeinc: "BGE, Inc.",
   homelight: "HomeLight",
-  // add more overrides here as you notice them
 };
 
 // US state full name -> abbreviation
@@ -191,7 +111,6 @@ function titleCaseCompany(input: string): string {
   const key = trimmed.toLowerCase().replace(/\s+/g, "");
   if (COMPANY_OVERRIDES[key]) return COMPANY_OVERRIDES[key];
 
-  // If the input already contains clear capitalization (e.g. "CBRE", "JLL"), keep it
   const hasUpper = /[A-Z]/.test(trimmed);
   const hasLower = /[a-z]/.test(trimmed);
   if (hasUpper && hasLower) return trimmed;
@@ -204,7 +123,7 @@ function titleCaseCompany(input: string): string {
       if (!w) return w;
       const up = w.toUpperCase();
       if (acronyms.has(up)) return up;
-      if (w.length <= 2) return up; // "AI", "RE"
+      if (w.length <= 2) return up;
       return w[0].toUpperCase() + w.slice(1);
     })
     .join(" ");
@@ -219,11 +138,9 @@ function normalizeState(input?: string | null): string {
   const key = s.toUpperCase();
   if (US_STATES[key]) return US_STATES[key];
 
-  // Sometimes state comes in like "Florida 33410" or "California, United States"
   const first = key.split(",")[0]?.trim() ?? key;
   if (US_STATES[first]) return US_STATES[first];
 
-  // If we can't map it, keep original (better than blank)
   return s;
 }
 
@@ -247,32 +164,17 @@ function isRemote(job: Job): boolean {
 
 function employmentTag(job: Job): string | null {
   const raw = `${job.title ?? ""}\n${job.description ?? ""}`;
-
-  // Normalize weird whitespace + weird hyphens Greenhouse sometimes uses
   const t = raw
     .toLowerCase()
-    .replace(/\u00a0/g, " ") // non-breaking space
-    .replace(/[\u2010-\u2015\u2212\u00ad]/g, "-"); // hyphen variants -> "-"
+    .replace(/\u00a0/g, " ")
+    .replace(/[\u2010-\u2015\u2212\u00ad]/g, "-");
 
-  // Match part-time first
   if (t.includes("part-time") || t.includes("part time")) return "Part-time";
   if (t.includes("full-time") || t.includes("full time")) return "Full-time";
-
-  // Optional extras
   if (t.includes("contract")) return "Contract";
   if (t.includes("intern")) return "Internship";
-
   return null;
 }
-
-
-
-function hasPay(j: Job) {
-  const p = (j.pay ?? j.pay_text ?? j.salary ?? "").toString().trim();
-  return p.length > 0;
-}
-
-
 
 function fmtLocation(job: Job): string {
   const city = (job.location_city ?? "").trim();
@@ -290,11 +192,12 @@ function extractPay(job: Job): string | null {
   const direct =
     (job.pay ?? "").trim() ||
     (job.salary ?? "").trim() ||
-    (job.compensation ?? "").trim();
+    (job.compensation ?? "").trim() ||
+    (job.pay_text ?? "").trim() ||
+    (job.pay_extracted ?? "").trim();
 
   if (direct) return direct;
 
-  // Try to find pay inside description/location text
   const text = `${job.description ?? ""}\n${job.location_raw ?? ""}`;
   const m =
     text.match(/\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i) ||
@@ -329,11 +232,10 @@ export default function BoardPage() {
   // Filters
   const [q, setQ] = useState("");
   const [company, setCompany] = useState<string>("ALL");
-  const [state, setState] = useState<string>("ALL");
+  const [state, setState] = useState<string>("ALL"); // <-- dropdown uses this
   const [source, setSource] = useState<string>("ALL");
   const [remoteOnly, setRemoteOnly] = useState<boolean>(false);
   const [payOnly, setPayOnly] = useState(false);
-
 
   // Paging
   const PAGE_SIZE = 25;
@@ -360,9 +262,11 @@ export default function BoardPage() {
         const { data, error } = await supabase
           .from("jobs")
           .select("company, location_state, source")
+          .eq("is_active", true)
           .limit(5000);
 
         if (error) throw error;
+
         const rows = (data ?? []) as Pick<Job, "company" | "location_state" | "source">[];
 
         const companies = new Set<string>();
@@ -372,7 +276,7 @@ export default function BoardPage() {
         for (const r of rows) {
           if (r.company) companies.add(titleCaseCompany(r.company));
           const st = normalizeState(r.location_state);
-          if (st) states.add(st);
+          if (st && st.length === 2) states.add(st); // keep only proper abbreviations
           if (r.source) sources.add(String(r.source).toLowerCase());
         }
 
@@ -380,7 +284,7 @@ export default function BoardPage() {
         setStateOptions(Array.from(states).sort((a, b) => a.localeCompare(b)));
         setSourceOptions(Array.from(sources).sort((a, b) => a.localeCompare(b)));
       } catch {
-        // If this fails, the board still works; options may just be empty.
+        // ignore
       }
     })();
   }, []);
@@ -399,11 +303,13 @@ export default function BoardPage() {
         let query = supabase
           .from("jobs")
           .select("*", { count: "exact" })
+          .eq("is_active", true)
           .order("posted_at", { ascending: false });
 
         const qq = q.trim();
         if (qq) {
-          const esc = qq.replace(/,/g, "\\,");
+          // use ilike search across fields, but DO NOT let this break state filtering
+          const esc = qq.replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/,/g, "\\,");
           query = query.or(
             [
               `title.ilike.%${esc}%`,
@@ -417,18 +323,14 @@ export default function BoardPage() {
         }
 
         if (company !== "ALL") {
-          // We store raw company in DB; do a looser match
           query = query.ilike("company", `%${company}%`);
         }
 
+        // ✅✅✅ FIXED STATE FILTER:
+        // Only filter using the normalized 2-letter abbreviation stored in location_state.
+        // No OR. No location_raw. No ilike.
         if (state !== "ALL") {
-          // Try match either abbreviation or full name if present in raw
-          query = query.or(
-            [
-              `location_state.ilike.%${state}%`,
-              `location_raw.ilike.%${state}%`,
-            ].join(",")
-          );
+          query = query.eq("location_state", state);
         }
 
         if (source !== "ALL") {
@@ -442,48 +344,25 @@ export default function BoardPage() {
               "location_city.ilike.%remote%",
               "location_state.ilike.%remote%",
             ].join(",")
-  );
-   
-        }
-       
-	if (payOnly) {
-  query = query.eq("has_pay", true);
-
+          );
         }
 
-	const from = (page - 1) * PAGE_SIZE;
-	const to = from + PAGE_SIZE - 1;
+        if (payOnly) {
+          // Use DB boolean first (fast + consistent)
+          query = query.eq("has_pay", true);
+        }
 
-	if (payOnly) {
- 	 // For "Pay shown", we need to filter using the SAME logic as the pill.
- 	 // Easiest + reliable: fetch more rows, filter in JS, then paginate.
- 	 const { data, error } = await query.limit(5000);
-	  if (error) throw error;
+        const from = (page - 1) * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
 
-	  const rows = (data ?? []) as Job[];
+        // Keep your payOnly special-mode pagination if you want,
+        // but it’s no longer needed now that has_pay is used.
+        const { data, error, count: c } = await query.range(from, to);
+        if (error) throw error;
 
-	  const withPay = rows.filter((j) => {
-	    const direct =
-	      (j.pay ?? "").toString().trim() ||
-	      (j.pay_text ?? "").toString().trim() ||
-	      (j.salary ?? "").toString().trim() ||
-	      (j.compensation ?? "").toString().trim();
-
-	    return Boolean(direct) || Boolean(extractPay(j));
- 	 });
-	
-	  setCount(withPay.length);
-	  setJobs(withPay.slice(from, to + 1));
-	} else {
- 	 // Normal mode: server-side pagination
- 	 const { data, error, count: c } = await query.range(from, to);
-	  if (error) throw error;
-
-	  setJobs((data ?? []) as Job[]);
-	  setCount(c ?? 0);
-}
-
-      } catch (e) {
+        setJobs((data ?? []) as Job[]);
+        setCount(c ?? 0);
+      } catch {
         setJobs([]);
         setCount(0);
       } finally {
@@ -500,13 +379,14 @@ export default function BoardPage() {
   }
 
   return (
-      <div className="min-h-[calc(100vh-120px)] bg-gray-50">    
-	<div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="min-h-[calc(100vh-120px)] bg-gray-50">
+      <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-<div className="mb-6 w-full">
-  <EmailSignup source="board" />
-</div>
+            <div className="mb-6 w-full">
+              <EmailSignup source="board" />
+            </div>
+
             <h1 className="text-2xl font-semibold text-gray-900">Jobs</h1>
             <div className="mt-1 text-sm text-gray-600">
               Signed in as <span className="font-medium">{userEmail ?? "…"}</span>
@@ -518,8 +398,6 @@ export default function BoardPage() {
               </button>
             </div>
           </div>
-
-
 
           <div className="text-sm text-gray-600">
             <span className="font-semibold text-gray-900">{count.toLocaleString()}</span> jobs
@@ -538,7 +416,6 @@ export default function BoardPage() {
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
-	
 
             <div className="md:col-span-3">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Company</label>
@@ -556,8 +433,6 @@ export default function BoardPage() {
               </select>
             </div>
 
-
-
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-700">State</label>
               <select
@@ -573,7 +448,7 @@ export default function BoardPage() {
                 ))}
               </select>
             </div>
-  
+
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-gray-700">Source</label>
               <select
@@ -601,16 +476,15 @@ export default function BoardPage() {
                 Remote only
               </label>
 
-<label className="inline-flex items-center gap-2 text-sm text-gray-700">
-  <input
-    type="checkbox"
-    checked={payOnly}
-    onChange={(e) => setPayOnly(e.target.checked)}
-    className="h-4 w-4 rounded border-gray-300"
-  />
-  Pay shown
-</label>
-
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={payOnly}
+                  onChange={(e) => setPayOnly(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Pay shown
+              </label>
 
               <button
                 type="button"
@@ -620,7 +494,7 @@ export default function BoardPage() {
                   setState("ALL");
                   setSource("ALL");
                   setRemoteOnly(false);
-setPayOnly(false);
+                  setPayOnly(false);
                 }}
                 className="text-sm font-semibold text-gray-700 hover:underline"
               >
@@ -647,13 +521,15 @@ setPayOnly(false);
                 const location = fmtLocation(job);
                 const posted = fmtDate(job.posted_at);
                 const remote = isRemote(job);
-		const emp = employmentTag(job);
+                const emp = employmentTag(job);
+
                 const pay =
-  		   (job.pay ?? "").toString().trim() ||
-  		   (job.pay_text ?? "").toString().trim() ||
- 		   (job.salary ?? "").toString().trim() ||
- 		   (job.compensation ?? "").toString().trim() ||
-  		   extractPay(job);
+                  (job.pay ?? "").toString().trim() ||
+                  (job.pay_text ?? "").toString().trim() ||
+                  (job.salary ?? "").toString().trim() ||
+                  (job.compensation ?? "").toString().trim() ||
+                  (job.pay_extracted ?? "").toString().trim() ||
+                  extractPay(job);
 
                 const sourceLabel = (job.source ?? "unknown").toLowerCase();
 
@@ -688,22 +564,13 @@ setPayOnly(false);
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-  			   {remote && <Pill>Remote</Pill>}
-			   {emp && <Pill>{emp}</Pill>}
-  			   {job.job_type && <Pill>{job.job_type}</Pill>}
-   			   {job.employment_type && <Pill>{job.employment_type}</Pill>}
- 			   <Pill>{sourceLabel}</Pill>
-
-  			   {pay ? <Pill>Pay: {pay}</Pill> : null}
-
-  			   {/* TEMP DEBUG — remove after 확인 */}
-  			   {payOnly ? (
-  			     <span className="text-xs text-gray-500">
-   			      debug pay fields: [{String(job.pay ?? "")}] [{String(job.pay_text ?? "")}] [{String(job.salary ?? "")}] [{String(job.compensation ?? "")}]
-    			     </span>
- 		          ) : null}
-			</div>
-
+                          {remote && <Pill>Remote</Pill>}
+                          {emp && <Pill>{emp}</Pill>}
+                          {job.job_type && <Pill>{job.job_type}</Pill>}
+                          {job.employment_type && <Pill>{job.employment_type}</Pill>}
+                          <Pill>{sourceLabel}</Pill>
+                          {pay ? <Pill>Pay: {pay}</Pill> : null}
+                        </div>
 
                         <div className="mt-3 text-xs text-gray-500">
                           {posted ? `Posted ${posted}` : ""}
