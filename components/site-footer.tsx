@@ -3,9 +3,8 @@ import Link from "next/link";
 export default function SiteFooter() {
   return (
     <footer className="border-t border-slate-200 bg-white">
-      {/* 2 columns on desktop (left + right). Pages aligned right on md+ */}
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2">
-        {/* Left column */}
+        {/* LEFT: Brand + contact */}
         <div>
           <div className="text-base font-extrabold tracking-tight">HireCRE</div>
           <p className="mt-2 text-sm text-slate-600">
@@ -21,62 +20,42 @@ export default function SiteFooter() {
               hirecre@a26cos.com
             </a>
           </p>
-
-          {/* Copyright moved here */}
           <p className="mt-4 text-xs text-slate-500">
             © {new Date().getFullYear()} HireCRE
           </p>
         </div>
 
-        {/* Right column */}
+        {/* RIGHT: Pages */}
         <div className="sm:text-right">
           <div className="text-sm font-semibold text-slate-900">Pages</div>
-          <ul className="mt-3 space-y-2 text-sm sm:ml-auto sm:inline-block sm:text-right">
+          <ul className="mt-3 space-y-2 text-sm sm:ml-auto sm:inline-block">
             <li>
-              <Link
-                className="text-slate-600 hover:text-slate-900 hover:underline"
-                href="/"
-              >
+              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/">
                 Home
               </Link>
             </li>
             <li>
-              <Link
-                className="text-slate-600 hover:text-slate-900 hover:underline"
-                href="/board"
-              >
+              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/board">
                 Jobs
               </Link>
             </li>
             <li>
-              <Link
-                className="text-slate-600 hover:text-slate-900 hover:underline"
-                href="/about"
-              >
+              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/about">
                 About
               </Link>
             </li>
             <li>
-              <Link
-                className="text-slate-600 hover:text-slate-900 hover:underline"
-                href="/contact"
-              >
+              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/contact">
                 Contact
               </Link>
             </li>
             <li>
-              <Link
-                className="text-slate-600 hover:text-slate-900 hover:underline"
-                href="/privacy"
-              >
+              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/privacy">
                 Privacy
               </Link>
             </li>
             <li>
-              <Link
-                className="text-slate-600 hover:text-slate-900 hover:underline"
-                href="/terms"
-              >
+              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/terms">
                 Terms
               </Link>
             </li>
