@@ -185,7 +185,7 @@ function titleCaseCompany(input: string): string {
       if (acronyms.has(up)) return up;
       if (w.length <= 2) return up;
       return w[0].toUpperCase() + w.slice(1);
-    })
+    }
     .join(" ");
 }
 
