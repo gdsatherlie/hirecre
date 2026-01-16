@@ -18,7 +18,7 @@ type Job = {
   location_state?: string | null;
   location_raw?: string | null;
 
-  // tags (kept in type for DB compatibility, but we do not display pills)
+  // tags (kept in type even if we don't show them)
   job_type?: string | null;
   employment_type?: string | null;
 
@@ -390,17 +390,15 @@ export default function BoardPage() {
               `location_raw.ilike.%${esc}%`,
               `location_city.ilike.%${esc}%`,
               `location_state.ilike.%${esc}%`,
-              `job_type.ilike.%${esc}%`,
             ].join(",")
           );
         }
 
         if (company !== "ALL") {
-          // company dropdown values are display-normalized; do an ilike match
           query = query.ilike("company", `%${company}%`);
         }
 
-        // ✅ State filter ONLY uses location_state exact match
+        // State filter uses location_state exact match
         if (state !== "ALL") {
           query = query.eq("location_state", state);
         }
@@ -431,91 +429,77 @@ export default function BoardPage() {
 
         setJobs((data ?? []) as Job[]);
         setCount(c ?? 0);
+
+        // Update last seen timestamp for next visit (only after a successful fetch)
+        try {
+          localStorage.setItem("hirecre:lastSeenBoard", new Date().toISOString());
+        } catch {}
       } catch {
         setJobs([]);
         setCount(0);
       } finally {
         setLoading(false);
       }
-
-      // Update last seen timestamp for next visit (only after successful fetch)
-      try {
-        localStorage.setItem("hirecre:lastSeenBoard", new Date().toISOString());
-      } catch {}
     })();
   }, [q, company, state, source, remoteOnly, payOnly, page]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(count / PAGE_SIZE)), [count]);
 
-  // ✅ ONE saveThisSearch function (not inside any useEffect)
   async function saveThisSearch() {
-  if (!userId || !userEmail) {
-    setSaveSearchMsg("You must be logged in to save searches.");
-    return;
-  }
-
-  setSavingSearch(true);
-  setSaveSearchMsg("");
-
-  try {
-    // Friendly default name
-    const defaultNameParts: string[] = [];
-    if (state !== "ALL") defaultNameParts.push(state);
-    if (company !== "ALL") defaultNameParts.push(company);
-    if (source !== "ALL") defaultNameParts.push(source);
-    if (remoteOnly) defaultNameParts.push("Remote");
-    if (payOnly) defaultNameParts.push("Pay");
-    const defaultName = defaultNameParts.length ? defaultNameParts.join(" • ") : "My search";
-
-    const name = window.prompt("Name this search:", defaultName);
-    if (!name) return;
-
-    const payload = {
-      user_id: userId,
-      user_email: userEmail,
-      name: name.trim(),
-      filters: {
-        q: q.trim(),
-        company,
-        state,
-        source,
-      },
-      remote_only: remoteOnly,
-      pay_only: payOnly,
-      is_enabled: true,
-    };
-
-    // Prevent duplicates (same user + same filter combo)
-    let dupeQuery = supabase
-      .from("saved_searches")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("remote_only", remoteOnly)
-      .eq("pay_only", payOnly)
-      .limit(1);
-
-    // match filters jsonb exactly
-    dupeQuery = dupeQuery.eq("filters", payload.filters);
-
-    const { data: dupes, error: dupeErr } = await dupeQuery;
-    if (dupeErr) throw dupeErr;
-
-    if (dupes && dupes.length > 0) {
-      setSaveSearchMsg("This search is already saved.");
+    if (!userId || !userEmail) {
+      setSaveSearchMsg("You must be logged in to save searches.");
       return;
     }
 
-    const { error: insErr } = await supabase.from("saved_searches").insert(payload);
-    if (insErr) throw insErr;
+    setSavingSearch(true);
+    setSaveSearchMsg("");
 
-    setSaveSearchMsg("Saved! Alerts will email you when new jobs match.");
-  } catch (e: any) {
-    setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
-  } finally {
-    setSavingSearch(false);
+    try {
+      // Build a clean JSON object (only strings/booleans/null — ALWAYS valid JSON)
+      const filters = {
+        q: q.trim() || null,
+        company: company !== "ALL" ? company : null,
+        state: state !== "ALL" ? state : null,
+        source: source !== "ALL" ? source : null,
+        remote_only: remoteOnly,
+        pay_only: payOnly,
+      };
+
+      // Default name suggestion
+      const nameParts: string[] = [];
+      if (filters.state) nameParts.push(filters.state);
+      if (filters.company) nameParts.push(filters.company);
+      if (filters.remote_only) nameParts.push("Remote");
+      if (filters.pay_only) nameParts.push("Pay");
+      if (filters.q) nameParts.push(`"${filters.q}"`);
+
+      const defaultName = nameParts.length ? nameParts.join(" • ") : "My search";
+      const name = window.prompt("Name this search:", defaultName);
+      if (!name || !name.trim()) {
+        setSaveSearchMsg("Cancelled.");
+        return;
+      }
+
+      const payload = {
+        user_id: userId,
+        user_email: userEmail,
+        name: name.trim(),
+        filters,                 // jsonb
+        remote_only: remoteOnly, // boolean column you added
+        pay_only: payOnly,       // boolean column you added
+        is_enabled: true,
+      };
+
+      const { error } = await supabase.from("saved_searches").insert(payload);
+      if (error) throw error;
+
+      setSaveSearchMsg("Saved! (Next: we’ll build /alerts to manage them.)");
+    } catch (e: any) {
+      setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setSavingSearch(false);
+    }
   }
-}
-
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -609,7 +593,7 @@ export default function BoardPage() {
               </select>
             </div>
 
-            <div className="md:col-span-12 flex items-center gap-4 pt-1">
+            <div className="md:col-span-12 flex flex-wrap items-center gap-4 pt-1">
               <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -682,9 +666,7 @@ export default function BoardPage() {
                 let isNew = false;
                 if (seenReady && lastSeen && job.posted_at) {
                   try {
-                    isNew =
-                      new Date(job.posted_at).getTime() >
-                      new Date(lastSeen).getTime();
+                    isNew = new Date(job.posted_at).getTime() > new Date(lastSeen).getTime();
                   } catch {
                     isNew = false;
                   }
