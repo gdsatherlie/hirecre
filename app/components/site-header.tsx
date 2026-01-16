@@ -1,4 +1,26 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const NavLink = ({ href, label }: { href: string; label: string }) => {
+  const pathname = usePathname();
+  const active = pathname === href;
+
+  return (
+    <Link
+      href={href}
+      className={[
+        "rounded-lg px-3 py-2 text-sm font-medium transition",
+        active
+          ? "bg-slate-900 text-white"
+          : "text-slate-600 hover:bg-white hover:text-slate-900",
+      ].join(" ")}
+    >
+      {label}
+    </Link>
+  );
+};
 
 export default function SiteHeader() {
   return (
@@ -6,6 +28,8 @@ export default function SiteHeader() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <div className="flex items-baseline gap-3">
           <Link href="/" className="text-lg font-extrabold tracking-tight">
+  HireCRE <span className="ml-2 rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">TEST</span>
+</Link>
             HireCRE
           </Link>
           <span className="hidden text-sm text-slate-500 sm:inline">
@@ -14,30 +38,11 @@ export default function SiteHeader() {
         </div>
 
         <nav className="flex items-center gap-1">
-          <Link
-            href="/board"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900"
-          >
-            Jobs
-          </Link>
-          <Link
-            href="/about"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900"
-          >
-            About
-          </Link>
-          <Link
-            href="/contact"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900"
-          >
-            Contact
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-900"
-          >
-            Login
-          </Link>
+          <NavLink href="/board" label="Jobs" />
+          <NavLink href="/alerts" label="Alerts" />
+          <NavLink href="/about" label="About" />
+          <NavLink href="/contact" label="Contact" />
+          <NavLink href="/login" label="Login" />
         </nav>
       </div>
     </header>
