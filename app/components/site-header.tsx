@@ -14,12 +14,19 @@ export default function SiteHeader() {
           <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/board">
             Jobs
           </Link>
+
+          <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/alerts">
+            Alerts
+          </Link>
+
           <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/about">
             About
           </Link>
+
           <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/contact">
             Contact
           </Link>
+
           <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/login">
             Login
           </Link>
