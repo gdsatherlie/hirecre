@@ -449,66 +449,73 @@ export default function BoardPage() {
 
   // ✅ ONE saveThisSearch function (not inside any useEffect)
   async function saveThisSearch() {
-    if (!userId || !userEmail) {
-      setSaveSearchMsg("You must be logged in to save searches.");
+  if (!userId || !userEmail) {
+    setSaveSearchMsg("You must be logged in to save searches.");
+    return;
+  }
+
+  setSavingSearch(true);
+  setSaveSearchMsg("");
+
+  try {
+    // Friendly default name
+    const defaultNameParts: string[] = [];
+    if (state !== "ALL") defaultNameParts.push(state);
+    if (company !== "ALL") defaultNameParts.push(company);
+    if (source !== "ALL") defaultNameParts.push(source);
+    if (remoteOnly) defaultNameParts.push("Remote");
+    if (payOnly) defaultNameParts.push("Pay");
+    const defaultName = defaultNameParts.length ? defaultNameParts.join(" • ") : "My search";
+
+    const name = window.prompt("Name this search:", defaultName);
+    if (!name) return;
+
+    const payload = {
+      user_id: userId,
+      user_email: userEmail,
+      name: name.trim(),
+      filters: {
+        q: q.trim(),
+        company,
+        state,
+        source,
+      },
+      remote_only: remoteOnly,
+      pay_only: payOnly,
+      is_enabled: true,
+    };
+
+    // Prevent duplicates (same user + same filter combo)
+    let dupeQuery = supabase
+      .from("saved_searches")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("remote_only", remoteOnly)
+      .eq("pay_only", payOnly)
+      .limit(1);
+
+    // match filters jsonb exactly
+    dupeQuery = dupeQuery.eq("filters", payload.filters);
+
+    const { data: dupes, error: dupeErr } = await dupeQuery;
+    if (dupeErr) throw dupeErr;
+
+    if (dupes && dupes.length > 0) {
+      setSaveSearchMsg("This search is already saved.");
       return;
     }
 
-    setSavingSearch(true);
-    setSaveSearchMsg("");
+    const { error: insErr } = await supabase.from("saved_searches").insert(payload);
+    if (insErr) throw insErr;
 
-    try {
-      const payload = {
-        user_id: userId,
-        subscriber_email: userEmail,
-        q: q.trim() ? q.trim() : null,
-        state: state !== "ALL" ? state : null,
-        company: company !== "ALL" ? company : null,
-        source: source !== "ALL" ? source : null,
-        remote_only: remoteOnly,
-        pay_only: payOnly,
-        is_enabled: true,
-      };
-
-      // Prevent duplicate saved searches
-      let dupeQuery = supabase
-        .from("saved_searches")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("remote_only", remoteOnly)
-        .eq("pay_only", payOnly)
-        .limit(1);
-
-      if (payload.q === null) dupeQuery = dupeQuery.is("q", null);
-      else dupeQuery = dupeQuery.eq("q", payload.q);
-
-      if (payload.state === null) dupeQuery = dupeQuery.is("state", null);
-      else dupeQuery = dupeQuery.eq("state", payload.state);
-
-      if (payload.company === null) dupeQuery = dupeQuery.is("company", null);
-      else dupeQuery = dupeQuery.eq("company", payload.company);
-
-      if (payload.source === null) dupeQuery = dupeQuery.is("source", null);
-      else dupeQuery = dupeQuery.eq("source", payload.source);
-
-      const { data: dupeRows, error: dupeErr } = await dupeQuery;
-      if (dupeErr) throw dupeErr;
-
-      if (dupeRows && dupeRows.length > 0) {
-        setSaveSearchMsg("This search is already saved.");
-        return;
-      }
-
-      const { error: insErr } = await supabase.from("saved_searches").insert(payload);
-      if (insErr) throw insErr;
-
-      setSaveSearchMsg("Saved! Alerts will email you when new jobs match.");
-    } catch (e: any) {
-      setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
-    } finally {
-      setSavingSearch(false);
-    }
+    setSaveSearchMsg("Saved! Alerts will email you when new jobs match.");
+  } catch (e: any) {
+    setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
+  } finally {
+    setSavingSearch(false);
   }
+}
+
 
   async function signOut() {
     await supabase.auth.signOut();
