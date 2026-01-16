@@ -37,6 +37,7 @@ export default function SiteHeader() {
 
         <nav className="flex items-center gap-1">
           <NavLink href="/board" label="Jobs" />
+          <NavLink href="/alerts" label="Alerts" />
           <NavLink href="/about" label="About" />
           <NavLink href="/contact" label="Contact" />
           <NavLink href="/login" label="Login" />
@@ -45,4 +46,3 @@ export default function SiteHeader() {
     </header>
   );
 }
-
