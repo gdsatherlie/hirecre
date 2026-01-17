@@ -9,6 +9,8 @@
     "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "next lint",
     "sync:greenhouse": "node scripts/sync-greenhouse.mjs"
+    "alerts:run": "node scripts/run-saved-search-alerts.mjs"
+
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
