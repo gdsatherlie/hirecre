@@ -505,6 +505,17 @@ export default function BoardPage() {
       }
 
       setSaveSearchMsg("Saved! Manage alerts at /alerts.");
+// ALSO add this user to the MailerLite "HireCRE Job Alerts" group
+try {
+  await fetch("/api/mailerlite/subscribe-alerts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: userEmail }),
+  });
+} catch {
+  // don't block saving the search if MailerLite is temporarily down
+}
+
     } catch (e: any) {
       setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
     } finally {
