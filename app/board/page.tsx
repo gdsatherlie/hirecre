@@ -493,7 +493,18 @@ export default function BoardPage() {
       const { error } = await supabase.from("saved_searches").insert(payload);
       if (error) throw error;
 
-      setSaveSearchMsg("Saved! (Next: we’ll build /alerts to manage them.)");
+      // ✅ STEP 4: also add them to the MailerLite Alerts group (best-effort)
+      try {
+        await fetch("/api/alerts/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userEmail }),
+        });
+      } catch {
+        // ignore — saving search still succeeded
+      }
+
+      setSaveSearchMsg("Saved! Manage alerts at /alerts.");
     } catch (e: any) {
       setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
     } finally {
