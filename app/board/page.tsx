@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import EmailSignup from "@/components/EmailSignup";
 import { createClient } from "@supabase/supabase-js";
 
+/**
+ * Minimal change update:
+ * - Adds click tracking for board job clicks (title link + "View job" button)
+ * - Does NOT change existing logic, queries, filters, or UI structure
+ * - Uses /api/track-click (you must add app/api/track-click/route.ts)
+ */
+
 type Job = {
   id: string;
 
@@ -245,11 +252,45 @@ function extractPay(job: Job): string | null {
 
   const text = `${job.description ?? ""}\n${job.location_raw ?? ""}`;
   const m =
-    text.match(/\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i) ||
+    text.match(
+      /\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i
+    ) ||
     text.match(/\$\s?\d{2,3}(?:,\d{3})+(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)/i) ||
     text.match(/\$\s?\d+(?:,\d{3})*\s?(?:\/hour|\/hr|per hour|hr)/i);
 
   return m ? m[0].replace(/\s+/g, " ").trim() : null;
+}
+
+/**
+ * NEW: Click tracking for "most-clicked jobs" (board-only).
+ * This is best-effort and does NOT block navigation.
+ * Requires: app/api/track-click/route.ts and Supabase click_events table + RLS insert policy.
+ */
+function trackJobClick(jobId: string) {
+  try {
+    const payload = JSON.stringify({
+      kind: "job",
+      targetId: String(jobId),
+      source: "board",
+    });
+
+    // sendBeacon is ideal for "fire-and-forget" analytics
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+      const blob = new Blob([payload], { type: "application/json" });
+      navigator.sendBeacon("/api/track-click", blob);
+      return;
+    }
+
+    // fallback
+    fetch("/api/track-click", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
 }
 
 function Pill({
@@ -484,9 +525,9 @@ export default function BoardPage() {
         user_id: userId,
         user_email: userEmail,
         name: name.trim(),
-        filters,                 // jsonb
+        filters, // jsonb
         remote_only: remoteOnly, // boolean column you added
-        pay_only: payOnly,       // boolean column you added
+        pay_only: payOnly, // boolean column you added
         is_enabled: true,
       };
 
@@ -505,17 +546,17 @@ export default function BoardPage() {
       }
 
       setSaveSearchMsg("Saved! Manage alerts at /alerts.");
-// ALSO add this user to the MailerLite "HireCRE Job Alerts" group
-try {
-  await fetch("/api/mailerlite/subscribe-alerts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: userEmail }),
-  });
-} catch {
-  // don't block saving the search if MailerLite is temporarily down
-}
 
+      // ALSO add this user to the MailerLite "HireCRE Job Alerts" group
+      try {
+        await fetch("/api/mailerlite/subscribe-alerts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userEmail }),
+        });
+      } catch {
+        // don't block saving the search if MailerLite is temporarily down
+      }
     } catch (e: any) {
       setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
     } finally {
@@ -718,6 +759,7 @@ try {
                               target="_blank"
                               rel="noreferrer"
                               className="hover:underline"
+                              onClick={() => trackJobClick(job.id)}
                             >
                               {job.title ?? "Untitled role"}
                             </a>
@@ -753,6 +795,7 @@ try {
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                            onClick={() => trackJobClick(job.id)}
                           >
                             View job
                           </a>
