@@ -1,235 +1,245 @@
+// scripts/run-saved-search-alerts.mjs
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
-const ALERT_FROM_EMAIL = process.env.ALERT_FROM_EMAIL || "hirecre@a26cos.com";
-const ALERT_FROM_NAME = process.env.ALERT_FROM_NAME || "HireCRE Alerts";
+const APP_URL = (process.env.APP_URL || "https://hirecre.com").replace(/\/$/, "");
+const DRY_RUN = String(process.env.DRY_RUN || "1") === "1";
+
+// Optional transactional sender (recommended for alerts)
+// If you don't set these, the script will still run (and log) in DRY_RUN.
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const MAIL_FROM = process.env.MAIL_FROM || "HireCRE <hirecre@a26cos.com>";
 
 if (!SUPABASE_URL) throw new Error("Missing SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
 if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-if (!MAILERSEND_API_KEY) throw new Error("Missing MAILERSEND_API_KEY");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-function escHtml(s = "") {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function norm(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  return s ? s : null;
 }
 
-function buildEmailHtml({ title, items, manageUrl, siteUrl }) {
-  const rows = items
-    .map(
-      (j) => `
-      <tr>
-        <td style="padding:14px 0;border-bottom:1px solid #e5e7eb;">
-          <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">
-            <a href="${escHtml(j.url)}" style="color:#0f172a;text-decoration:none;">${escHtml(j.title)}</a>
-          </div>
-          <div style="font-size:13px;color:#334155;">
-            ${escHtml(j.company)} • ${escHtml(j.location)}
-          </div>
-          <div style="font-size:12px;color:#64748b;margin-top:6px;">
-            Source: ${escHtml(j.source)}${j.pay ? " • Pay: " + escHtml(j.pay) : ""}
-          </div>
-        </td>
-      </tr>`
-    )
-    .join("");
+function jobMatches(job, f) {
+  const company = norm(f.company);
+  const state = norm(f.state);
+  const source = norm(f.source);
+  const q = norm(f.q);
 
-  return `<!doctype html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;">
-  <div style="max-width:640px;margin:0 auto;padding:28px 16px;">
-    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <a href="${siteUrl}" style="font-size:18px;font-weight:800;letter-spacing:-0.02em;color:#0f172a;text-decoration:none;">
-          HireCRE
+  const remoteOnly = !!f.remote_only;
+  const payOnly = !!f.pay_only;
+
+  if (company) {
+    const hay = String(job.company || "").toLowerCase();
+    if (!hay.includes(company.toLowerCase())) return false;
+  }
+
+  if (state) {
+    const st = String(job.location_state || "").toUpperCase().trim();
+    if (st !== state.toUpperCase()) return false;
+  }
+
+  if (source) {
+    const src = String(job.source || "").toLowerCase().trim();
+    if (src !== source.toLowerCase()) return false;
+  }
+
+  if (remoteOnly) {
+    const hay = `${job.location_raw || ""} ${job.location_city || ""} ${job.location_state || ""}`.toLowerCase();
+    if (!hay.includes("remote")) return false;
+  }
+
+  if (payOnly) {
+    if (!job.has_pay) return false;
+  }
+
+  if (q) {
+    const hay = `${job.title || ""} ${job.company || ""} ${job.location_raw || ""} ${job.location_city || ""} ${job.location_state || ""} ${job.description || ""}`.toLowerCase();
+    if (!hay.includes(q.toLowerCase())) return false;
+  }
+
+  return true;
+}
+
+function buildHtml(email, searchName, jobs) {
+  const manageUrl = `${APP_URL}/alerts`;
+
+  const items = jobs.slice(0, 20).map((j) => {
+    const loc =
+      [j.location_city, j.location_state].filter(Boolean).join(", ") ||
+      j.location_raw ||
+      "—";
+    const pay = j.pay_extracted || "";
+    return `
+      <div style="padding:14px;border:1px solid #e5e7eb;border-radius:14px;margin:10px 0;background:#ffffff;">
+        <div style="font-size:15px;font-weight:700;margin:0 0 6px;color:#0f172a;">
+          <a href="${j.url || j.job_url || "#"}" style="color:#0f172a;text-decoration:none;">${j.title || "Untitled role"}</a>
+        </div>
+        <div style="font-size:13px;color:#334155;margin:0 0 6px;">
+          <strong>${j.company || "—"}</strong> • ${loc}
+        </div>
+        <div style="font-size:12px;color:#64748b;">
+          ${j.source ? String(j.source).toLowerCase() : "unknown"}${pay ? ` • Pay: ${pay}` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+  <div style="background:#f8fafc;padding:28px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">
+    <div style="max-width:720px;margin:0 auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <a href="${APP_URL}" style="text-decoration:none;color:#0f172a;">
+          <span style="font-weight:800;font-size:18px;letter-spacing:-0.02em;">HireCRE</span>
         </a>
         <a href="${manageUrl}" style="font-size:12px;color:#2563eb;text-decoration:none;">Manage alerts</a>
       </div>
 
-      <h1 style="font-size:18px;margin:18px 0 6px;color:#0f172a;">${escHtml(title)}</h1>
-      <p style="margin:0 0 14px;color:#475569;font-size:13px;">New jobs matching your saved search.</p>
+      <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:18px;padding:20px;">
+        <div style="font-size:18px;font-weight:900;color:#0f172a;margin:0 0 6px;">
+          HireCRE alert: ${searchName}
+        </div>
+        <div style="font-size:13px;color:#64748b;margin:0 0 14px;">
+          New jobs matching your saved search (${email})
+        </div>
 
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-        ${rows}
-      </table>
+        ${items}
 
-      <div style="margin-top:18px;font-size:12px;color:#64748b;">
-        Didn’t expect this? You can disable alerts here:
-        <a href="${manageUrl}" style="color:#2563eb;text-decoration:none;">${manageUrl}</a>
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:12px;color:#64748b;">
+          <a href="${manageUrl}" style="color:#2563eb;text-decoration:none;">Manage alerts</a>
+          &nbsp;•&nbsp;
+          <a href="${APP_URL}" style="color:#2563eb;text-decoration:none;">Visit HireCRE</a>
+        </div>
       </div>
     </div>
-
-    <div style="text-align:center;margin-top:12px;color:#94a3b8;font-size:12px;">
-      © ${new Date().getFullYear()} HireCRE
-    </div>
   </div>
-</body>
-</html>`;
+  `;
 }
 
-async function sendEmail({ toEmail, subject, html }) {
-  const res = await fetch("https://api.mailersend.com/v1/email", {
+async function sendWithResend({ to, subject, html }) {
+  if (!RESEND_API_KEY) throw new Error("Missing RESEND_API_KEY");
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${MAILERSEND_API_KEY}`,
+      Authorization: `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: { email: ALERT_FROM_EMAIL, name: ALERT_FROM_NAME },
-      to: [{ email: toEmail }],
+      from: MAIL_FROM,
+      to: [to],
       subject,
       html,
     }),
   });
 
   if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`MailerSend error ${res.status}: ${txt}`);
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Resend failed: ${res.status} ${txt}`);
   }
-}
-
-function matchJobToSearch(job, s) {
-  // s has: q, state, company, source, remote_only, pay_only (nullable)
-  if (s.state && job.location_state !== s.state) return false;
-  if (s.source && String(job.source || "").toLowerCase() !== String(s.source).toLowerCase()) return false;
-
-  if (s.company) {
-    const hay = String(job.company || "").toLowerCase();
-    if (!hay.includes(String(s.company).toLowerCase())) return false;
-  }
-
-  if (s.remote_only) {
-    const hay = `${job.location_raw || ""} ${job.location_city || ""} ${job.location_state || ""}`.toLowerCase();
-    if (!hay.includes("remote")) return false;
-  }
-
-  if (s.pay_only) {
-    if (!job.has_pay) return false;
-  }
-
-  if (s.q) {
-    const hay = `${job.title || ""} ${job.company || ""} ${job.location_raw || ""} ${job.location_city || ""} ${job.location_state || ""}`.toLowerCase();
-    if (!hay.includes(String(s.q).toLowerCase())) return false;
-  }
-
-  return true;
-}
-
-function fmtLocation(job) {
-  const city = (job.location_city || "").trim();
-  const state = (job.location_state || "").trim();
-  const raw = (job.location_raw || "").trim();
-  if (city && state) return `${city}, ${state}`;
-  if (city) return city;
-  if (state) return state;
-  return raw || "—";
-}
-
-function extractPay(job) {
-  return (
-    (job.pay_extracted || "").trim() ||
-    (job.pay || "").trim() ||
-    (job.pay_text || "").trim() ||
-    (job.salary || "").trim() ||
-    (job.compensation || "").trim() ||
-    null
-  );
 }
 
 async function main() {
-  const SITE_URL = process.env.SITE_URL || "https://hirecre.com";
-  const MANAGE_ALERTS_URL = process.env.MANAGE_ALERTS_URL || `${SITE_URL}/alerts`;
+  // 0) create a run record
+  const { data: runRow, error: runErr } = await supabase
+    .from("alert_runs")
+    .insert({ started_at: new Date().toISOString(), dry_run: DRY_RUN })
+    .select("id")
+    .single();
 
-  // 1) load enabled saved searches
-  const { data: searches, error: sErr } = await supabase
-    .from("saved_searches")
-    .select("id,user_email,q,state,company,source,remote_only,pay_only,is_enabled,last_alerted_at")
-    .eq("is_enabled", true)
-    .limit(5000);
+  if (runErr) throw runErr;
+  const runId = runRow.id;
 
-  if (sErr) throw sErr;
-  if (!searches || searches.length === 0) {
-    console.log("No enabled saved searches.");
+  // 1) load active alert subscriptions
+  // IMPORTANT: this assumes saved_search_alerts links to saved_searches + email_subscribers via FK relations.
+  // If your FK names differ, we can adjust, but this is the standard Supabase pattern.
+  const { data: subs, error: subErr } = await supabase
+    .from("saved_search_alerts")
+    .select(`
+      id,
+      is_enabled,
+      saved_search_id,
+      subscriber_id,
+      saved_searches ( id, name, filters, is_enabled ),
+      email_subscribers ( id, email )
+    `)
+    .eq("is_enabled", true);
+
+  if (subErr) throw subErr;
+
+  const enabledSubs = (subs || []).filter((s) => s.saved_searches?.is_enabled);
+  if (enabledSubs.length === 0) {
+    console.log("No enabled saved_search_alerts found.");
+    await supabase.from("alert_runs").update({ finished_at: new Date().toISOString() }).eq("id", runId);
     return;
   }
 
-  // 2) load recent jobs (last 3 days) to match against
-  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  // 2) pull recent jobs once
   const { data: jobs, error: jErr } = await supabase
     .from("jobs")
-    .select("id,title,company,source,location_city,location_state,location_raw,url,posted_at,has_pay,pay_extracted,pay,pay_text,salary,compensation")
+    .select("id,title,company,source,url,job_url,posted_at,location_city,location_state,location_raw,description,has_pay,pay_extracted,is_active")
     .eq("is_active", true)
-    .gte("posted_at", since)
     .order("posted_at", { ascending: false })
-    .limit(5000);
+    .limit(700);
 
   if (jErr) throw jErr;
 
-  for (const s of searches) {
-    const email = s.user_email;
-    if (!email) continue;
+  let deliveriesCreated = 0;
+  let emailsProcessed = 0;
 
-    // 3) match jobs to this search
-    const matches = (jobs || []).filter((j) => matchJobToSearch(j, s)).slice(0, 20);
-    if (matches.length === 0) continue;
+  for (const sub of enabledSubs) {
+    const email = sub.email_subscribers?.email;
+    const search = sub.saved_searches;
 
-    // 4) remove jobs already sent for this saved_search
-    const matchIds = matches.map((m) => m.id);
+    if (!email || !search) continue;
 
-    const { data: already, error: aErr } = await supabase
-      .from("saved_search_alerts")
-      .select("job_id")
-      .eq("saved_search_id", s.id)
-      .in("job_id", matchIds);
+    const filters = search.filters || {};
+    const matched = (jobs || []).filter((job) => jobMatches(job, filters)).slice(0, 50);
+    if (matched.length === 0) continue;
 
-    if (aErr) throw aErr;
+    const subject = `HireCRE Alert: ${matched.length} new match${matched.length === 1 ? "" : "es"} (${search.name || "Saved search"})`;
+    const html = buildHtml(email, search.name || "Saved search", matched);
 
-    const alreadySet = new Set((already || []).map((r) => r.job_id));
-    const newOnes = matches.filter((m) => !alreadySet.has(m.id));
-
-    if (newOnes.length === 0) continue;
-
-    const items = newOnes.map((j) => ({
-      title: j.title || "Untitled role",
-      company: j.company || "—",
-      location: fmtLocation(j),
-      source: String(j.source || "unknown").toLowerCase(),
-      url: j.url || SITE_URL,
-      pay: extractPay(j),
-    }));
-
-    const subject = `HireCRE Alerts: ${newOnes.length} new job${newOnes.length === 1 ? "" : "s"}`;
-    const html = buildEmailHtml({
-      title: `${newOnes.length} new job${newOnes.length === 1 ? "" : "s"} for you`,
-      items,
-      manageUrl: MANAGE_ALERTS_URL,
-      siteUrl: SITE_URL,
+    // Write deliveries (dedupe happens at your DB level if you’ve set it up)
+    // Store one delivery row per (subscription) run.
+    const { error: delErr } = await supabase.from("alert_deliveries").insert({
+      run_id: runId,
+      saved_search_alert_id: sub.id,
+      subscriber_email: email,
+      matched_count: matched.length,
+      status: DRY_RUN ? "dry_run" : "sent",
+      subject,
     });
 
-    // 5) send email
-    await sendEmail({ toEmail: email, subject, html });
-    console.log(`Sent ${newOnes.length} to ${email}`);
+    if (delErr) throw delErr;
+    deliveriesCreated++;
 
-    // 6) record sent rows (dedupe)
-    const insertRows = newOnes.map((j) => ({ saved_search_id: s.id, job_id: j.id }));
-    const { error: insErr } = await supabase.from("saved_search_alerts").insert(insertRows);
-    if (insErr) throw insErr;
-
-    // 7) update last_alerted_at
-    await supabase.from("saved_searches").update({ last_alerted_at: new Date().toISOString() }).eq("id", s.id);
+    if (DRY_RUN) {
+      console.log(`[DRY_RUN] Would send to ${email}: ${subject}`);
+      emailsProcessed++;
+    } else {
+      // Send via transactional sender
+      await sendWithResend({ to: email, subject, html });
+      console.log(`Sent to ${email}: ${subject}`);
+      emailsProcessed++;
+    }
   }
 
-  console.log("Done.");
+  await supabase
+    .from("alert_runs")
+    .update({
+      finished_at: new Date().toISOString(),
+      deliveries_created: deliveriesCreated,
+      emails_processed: emailsProcessed,
+    })
+    .eq("id", runId);
+
+  console.log(`Done. deliveries=${deliveriesCreated} emails=${emailsProcessed} DRY_RUN=${DRY_RUN ? "1" : "0"}`);
 }
 
 main().catch((e) => {
