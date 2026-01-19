@@ -63,15 +63,21 @@ function quickLink(job) {
 function requirePlaceholder(html, placeholder) {
   if (!html.includes(placeholder)) {
     throw new Error(
-      `Template is missing placeholder ${placeholder}. Make sure templates/newsletter.html includes it exactly.`
+      `Template is missing placeholder ${placeholder}. Add it to templates/newsletter.html exactly.`
     );
   }
 }
 
-async function main() {
-  // --- Pull data from Supabase ---
+// Use UTC date to avoid timezone weirdness on servers
+function isoDateUTC(d = new Date()) {
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
-  // 1) Top jobs this week (fresh)
+async function main() {
+  // ---------- Pull data ----------
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: topJobs, error: topErr } = await supabase
@@ -84,8 +90,6 @@ async function main() {
 
   if (topErr) throw topErr;
 
-  // 2) Most clicked jobs (board only, last 7 days)
-  // This assumes you created the view "most_clicked_jobs_7d_details".
   const { data: mostClicked, error: popErr } = await supabase
     .from("most_clicked_jobs_7d_details")
     .select("id,title,company,location_city,location_state,location_raw,url,posted_at,clicks")
@@ -97,38 +101,29 @@ async function main() {
     );
   }
 
-  // --- Build content blocks ---
+  // ---------- Build content ----------
+  const issueDate = isoDateUTC(new Date());
+  const subject = `HireCRE Newsletter — ${issueDate}`;
+
   const content = {
     generated_at: new Date().toISOString(),
+    issue_date: issueDate,
+    subject,
     note:
       "Quick pulse check: hiring is still active across debt + acquisitions, but the best roles are moving fast. If you see something you like, don’t overthink it — apply, then tighten the story after.",
     top_jobs: topJobs ?? [],
     most_clicked_jobs: mostClicked ?? [],
   };
 
-  // --- Ensure output folder exists at the ROOT ---
-  // This creates: <project-root>/out
-  fs.mkdirSync(path.join(process.cwd(), "out"), { recursive: true });
-
-  // Save JSON for your own review
-  fs.writeFileSync(
-    path.join(process.cwd(), "out", "newsletter-content.json"),
-    JSON.stringify(content, null, 2)
-  );
-
-  // --- Load template from ROOT/templates/newsletter.html ---
+  // ---------- Load template ----------
   const templatePath = path.join(process.cwd(), "templates", "newsletter.html");
   const html = fs.readFileSync(templatePath, "utf8");
 
-  // Verify placeholders exist (prevents silent failures)
   requirePlaceholder(html, "{{THIS_WEEKS_NOTE}}");
   requirePlaceholder(html, "{{TOP_JOBS_CARDS}}");
   requirePlaceholder(html, "{{MOST_CLICKED_LIST}}");
 
-  // Create blocks
   const topCards = (content.top_jobs ?? []).slice(0, 3).map(roleCard).join("\n\n");
-
-  // If no top jobs this week, show a friendly fallback
   const topCardsFinal =
     topCards ||
     `<div style="color:#475569; font-size:13px; line-height:1.55; margin:0 0 12px;">
@@ -136,26 +131,43 @@ async function main() {
     </div>`;
 
   const popularLinks = (content.most_clicked_jobs ?? []).slice(0, 10).map(quickLink).join("\n\n");
-
-  // If no clicks yet, show fallback
   const popularLinksFinal =
     popularLinks ||
     `<div style="color:#475569; font-size:13px; line-height:1.55; margin:0;">
-      Not enough click data yet — check back next week once a few people have been browsing.
+      Not enough click data yet — check back next week once more people have been browsing.
     </div>`;
 
-  // Fill template using placeholders
   let outHtml = html;
   outHtml = outHtml.replace("{{THIS_WEEKS_NOTE}}", safe(content.note));
   outHtml = outHtml.replace("{{TOP_JOBS_CARDS}}", topCardsFinal);
   outHtml = outHtml.replace("{{MOST_CLICKED_LIST}}", popularLinksFinal);
 
-  // Write final HTML
+  // ---------- Write local artifacts (optional but handy) ----------
+  fs.mkdirSync(path.join(process.cwd(), "out"), { recursive: true });
+  fs.writeFileSync(
+    path.join(process.cwd(), "out", "newsletter-content.json"),
+    JSON.stringify(content, null, 2)
+  );
   fs.writeFileSync(path.join(process.cwd(), "out", "newsletter.html"), outHtml);
+
+  // ---------- Save to Supabase (THIS is the durable storage) ----------
+  const { error: upsertErr } = await supabase.from("newsletter_issues").upsert(
+    {
+      issue_date: issueDate,
+      subject,
+      html: outHtml,
+      content,
+    },
+    { onConflict: "issue_date" }
+  );
+
+  if (upsertErr) throw upsertErr;
 
   console.log("✅ Wrote:");
   console.log(" - out/newsletter.html");
   console.log(" - out/newsletter-content.json");
+  console.log("✅ Saved newsletter to Supabase table: newsletter_issues");
+  console.log(`✅ issue_date: ${issueDate}`);
 }
 
 main().catch((e) => {
