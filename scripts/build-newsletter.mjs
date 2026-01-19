@@ -141,6 +141,8 @@ async function main() {
       Not enough click data yet — check back next week once more people have been browsing.
     </div>`;
 
-  let outHtml = html;
-  outHtml = outHtml.replace("{{THIS_WEEKS_NOTE}}", safe(content.note));
-  outHtml = outHtml.replace("{{TOP_JOBS_CARDS}}", topC
+ let outHtml = html;
+outHtml = outHtml.replace("{{THIS_WEEKS_NOTE}}", safe(content.note));
+outHtml = outHtml.replace("{{TOP_JOBS_CARDS}}", topCardsFinal);
+outHtml = outHtml.replace("{{MOST_CLICKED_LIST}}", popularLinksFinal);
+
