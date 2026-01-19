@@ -119,7 +119,6 @@ async function main() {
   const templatePath = path.join(process.cwd(), "templates", "newsletter.html");
   const html = fs.readFileSync(templatePath, "utf8");
 
-  // These MUST exist in your templates/newsletter.html
   requirePlaceholder(html, "{{THIS_WEEKS_NOTE}}");
   requirePlaceholder(html, "{{TOP_JOBS_CARDS}}");
   requirePlaceholder(html, "{{MOST_CLICKED_LIST}}");
@@ -128,7 +127,7 @@ async function main() {
   const topCardsFinal =
     topCards ||
     `<div style="color:#475569; font-size:13px; line-height:1.55; margin:0 0 12px;">
-      No brand-new postings hit the feed in the last 7 days — but the board is still moving. Browse the latest roles.
+      No brand-new postings hit the feed in the last 7 days — browse the latest roles on the board.
     </div>`;
 
   const popularLinks = (content.most_clicked_jobs ?? [])
@@ -141,8 +140,42 @@ async function main() {
       Not enough click data yet — check back next week once more people have been browsing.
     </div>`;
 
- let outHtml = html;
-outHtml = outHtml.replace("{{THIS_WEEKS_NOTE}}", safe(content.note));
-outHtml = outHtml.replace("{{TOP_JOBS_CARDS}}", topCardsFinal);
-outHtml = outHtml.replace("{{MOST_CLICKED_LIST}}", popularLinksFinal);
+  let outHtml = html;
+  outHtml = outHtml.replace("{{THIS_WEEKS_NOTE}}", safe(content.note));
+  outHtml = outHtml.replace("{{TOP_JOBS_CARDS}}", topCardsFinal);
+  outHtml = outHtml.replace("{{MOST_CLICKED_LIST}}", popularLinksFinal);
 
+  // ---------- Write local artifacts (handy for debugging) ----------
+  fs.mkdirSync(path.join(process.cwd(), "out"), { recursive: true });
+  fs.writeFileSync(
+    path.join(process.cwd(), "out", "newsletter-content.json"),
+    JSON.stringify(content, null, 2)
+  );
+  fs.writeFileSync(path.join(process.cwd(), "out", "newsletter.html"), outHtml);
+
+  // ---------- Save to Supabase (durable storage) ----------
+  const { error: upsertErr } = await supabase
+    .from("newsletter_issues")
+    .upsert(
+      {
+        send_date: sendDate,
+        subject,
+        html: outHtml,
+        content,
+      },
+      { onConflict: "send_date" }
+    );
+
+  if (upsertErr) throw upsertErr;
+
+  console.log("✅ Wrote:");
+  console.log(" - out/newsletter.html");
+  console.log(" - out/newsletter-content.json");
+  console.log("✅ Saved newsletter to Supabase table: newsletter_issues");
+  console.log(`✅ send_date: ${sendDate}`);
+}
+
+main().catch((e) => {
+  console.error("❌ build-newsletter failed:", e?.message ?? e);
+  process.exit(1);
+});
