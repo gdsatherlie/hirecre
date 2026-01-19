@@ -1,28 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-/**
- * Sends the latest newsletter issue from Supabase via MailerLite.
- *
- * Requires env vars:
- *  - NEXT_PUBLIC_SUPABASE_URL
- *  - SUPABASE_SERVICE_ROLE_KEY
- *  - MAILERLITE_API_TOKEN
- *  - MAILERLITE_GROUP_ID  (the group/list you want to email)
- *
- * Optional:
- *  - MAILERLITE_FROM_NAME
- *  - MAILERLITE_FROM_EMAIL
- *  - MAILERLITE_REPLY_TO
- *
- * Safety:
- *  - Won't double-send if "sent_at" is already set.
- */
-
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAILERLITE_API_TOKEN = process.env.MAILERLITE_API_TOKEN;
-const MAILERLITE_GROUP_ID = process.env.MAILERLITE_GROUP_ID;
 
 const FROM_NAME = process.env.MAILERLITE_FROM_NAME || "HireCRE";
 const FROM_EMAIL = process.env.MAILERLITE_FROM_EMAIL || "hirecre@a26cos.com";
@@ -32,14 +13,14 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   process.exit(1);
 }
-if (!MAILERLITE_API_TOKEN || !MAILERLITE_GROUP_ID) {
-  console.error("Missing MAILERLITE_API_TOKEN or MAILERLITE_GROUP_ID");
+if (!MAILERLITE_API_TOKEN) {
+  console.error("Missing MAILERLITE_API_TOKEN");
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-async function mailerliteFetch(path, body) {
+async function mlPost(path, body) {
   const res = await fetch(`https://connect.mailerlite.com/api/${path}`, {
     method: "POST",
     headers: {
@@ -55,7 +36,7 @@ async function mailerliteFetch(path, body) {
   try {
     json = JSON.parse(text);
   } catch {
-    // keep as text
+    // leave as text
   }
 
   if (!res.ok) {
@@ -67,13 +48,7 @@ async function mailerliteFetch(path, body) {
 }
 
 async function ensureSentAtColumn() {
-  // If you already added sent_at, this does nothing.
-  // If not, you'll get a DB error later. We'll fail with a helpful message.
-  const { error } = await supabase
-    .from("newsletter_issues")
-    .select("sent_at")
-    .limit(1);
-
+  const { error } = await supabase.from("newsletter_issues").select("sent_at").limit(1);
   if (error) {
     throw new Error(
       "newsletter_issues.sent_at column is missing. Add it in Supabase:\n\n" +
@@ -91,7 +66,25 @@ async function getLatestUnsentIssue() {
     .limit(1);
 
   if (error) throw error;
-  return (data && data[0]) || null;
+  return data?.[0] ?? null;
+}
+
+async function getRecipients() {
+  // Pull recipients from newsletter_subscribers
+  const { data, error } = await supabase
+    .from("newsletter_subscribers")
+    .select("email")
+    .eq("is_active", true)
+    .limit(5000);
+
+  if (error) throw error;
+
+  const emails = (data ?? [])
+    .map((r) => String(r.email || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  // de-dupe
+  return Array.from(new Set(emails));
 }
 
 async function markSent(id) {
@@ -111,40 +104,44 @@ async function main() {
     console.log("✅ No unsent newsletter issues found. Nothing to send.");
     return;
   }
-
   if (!issue.subject || !issue.html) {
     throw new Error("Issue is missing subject or html in Supabase.");
   }
 
-  // 1) Create campaign
-  const campaign = await mailerliteFetch("campaigns", {
+  const emails = await getRecipients();
+  if (emails.length === 0) {
+    throw new Error("No active newsletter subscribers found in newsletter_subscribers.");
+  }
+
+  // Create + send in one request format that your error indicates you need:
+  // "emails" is required for type "regular" in your account.
+  const campaign = await mlPost("campaigns", {
     name: `HireCRE Newsletter ${issue.send_date}`,
     type: "regular",
     subject: issue.subject,
     from_name: FROM_NAME,
     from_email: FROM_EMAIL,
     reply_to: REPLY_TO,
-    groups: [MAILERLITE_GROUP_ID],
-    // MailerLite accepts HTML content under "content"
-    // If your account requires a different payload shape, we can adjust.
+
+    // THIS is the key fix:
+    emails,
+
+    // HTML body
     content: issue.html,
   });
 
   const campaignId = campaign?.data?.id;
-  if (!campaignId) {
-    throw new Error("MailerLite did not return a campaign id.");
-  }
+  if (!campaignId) throw new Error("MailerLite did not return a campaign id.");
 
-  // 2) Schedule or send now
-  // "send" endpoint sends immediately. If you want scheduling, we can do that next.
-  await mailerliteFetch(`campaigns/${campaignId}/actions/send`, {});
+  // Send now
+  await mlPost(`campaigns/${campaignId}/actions/send`, {});
 
-  // 3) Mark as sent in Supabase
   await markSent(issue.id);
 
   console.log("✅ Sent newsletter via MailerLite.");
   console.log(`✅ send_date: ${issue.send_date}`);
   console.log(`✅ campaign_id: ${campaignId}`);
+  console.log(`✅ recipients: ${emails.length}`);
 }
 
 main().catch((e) => {
