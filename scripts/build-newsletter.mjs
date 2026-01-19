@@ -102,15 +102,15 @@ async function main() {
   }
 
   // ---------- Build content ----------
-  const issueDate = isoDateUTC(new Date());
-  const subject = `HireCRE Newsletter — ${issueDate}`;
+  const sendDate = isoDateUTC(new Date());
+  const subject = `HireCRE Newsletter — ${sendDate}`;
 
   const content = {
     generated_at: new Date().toISOString(),
-    issue_date: issueDate,
+    send_date: sendDate,
     subject,
     note:
-      "Quick pulse check: hiring is still active across debt + acquisitions, but the best roles are moving fast. If you see something you like, don’t overthink it — apply, then tighten the story after.",
+      "Quick pulse check: the best roles are still moving fast. If you see something you like, don’t overthink it — apply, then tighten the story after.",
     top_jobs: topJobs ?? [],
     most_clicked_jobs: mostClicked ?? [],
   };
@@ -119,6 +119,7 @@ async function main() {
   const templatePath = path.join(process.cwd(), "templates", "newsletter.html");
   const html = fs.readFileSync(templatePath, "utf8");
 
+  // These MUST exist in your templates/newsletter.html
   requirePlaceholder(html, "{{THIS_WEEKS_NOTE}}");
   requirePlaceholder(html, "{{TOP_JOBS_CARDS}}");
   requirePlaceholder(html, "{{MOST_CLICKED_LIST}}");
@@ -130,7 +131,10 @@ async function main() {
       No brand-new postings hit the feed in the last 7 days — but the board is still moving. Browse the latest roles.
     </div>`;
 
-  const popularLinks = (content.most_clicked_jobs ?? []).slice(0, 10).map(quickLink).join("\n\n");
+  const popularLinks = (content.most_clicked_jobs ?? [])
+    .slice(0, 10)
+    .map(quickLink)
+    .join("\n\n");
   const popularLinksFinal =
     popularLinks ||
     `<div style="color:#475569; font-size:13px; line-height:1.55; margin:0;">
@@ -139,38 +143,4 @@ async function main() {
 
   let outHtml = html;
   outHtml = outHtml.replace("{{THIS_WEEKS_NOTE}}", safe(content.note));
-  outHtml = outHtml.replace("{{TOP_JOBS_CARDS}}", topCardsFinal);
-  outHtml = outHtml.replace("{{MOST_CLICKED_LIST}}", popularLinksFinal);
-
-  // ---------- Write local artifacts (optional but handy) ----------
-  fs.mkdirSync(path.join(process.cwd(), "out"), { recursive: true });
-  fs.writeFileSync(
-    path.join(process.cwd(), "out", "newsletter-content.json"),
-    JSON.stringify(content, null, 2)
-  );
-  fs.writeFileSync(path.join(process.cwd(), "out", "newsletter.html"), outHtml);
-
-  // ---------- Save to Supabase (THIS is the durable storage) ----------
-  const { error: upsertErr } = await supabase.from("newsletter_issues").upsert(
-    {
-      issue_date: issueDate,
-      subject,
-      html: outHtml,
-      content,
-    },
-    { onConflict: "issue_date" }
-  );
-
-  if (upsertErr) throw upsertErr;
-
-  console.log("✅ Wrote:");
-  console.log(" - out/newsletter.html");
-  console.log(" - out/newsletter-content.json");
-  console.log("✅ Saved newsletter to Supabase table: newsletter_issues");
-  console.log(`✅ issue_date: ${issueDate}`);
-}
-
-main().catch((e) => {
-  console.error("❌ build-newsletter failed:", e?.message ?? e);
-  process.exit(1);
-});
+  outHtml = outHtml.replace("{{TOP_JOBS_CARDS}}", topC
