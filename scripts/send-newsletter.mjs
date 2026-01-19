@@ -127,8 +127,13 @@ async function main() {
     emails,
 
     // HTML body
-    content: issue.html,
-  });
+// IMPORTANT FIX 👇
+  content: [
+    {
+      html: issue.html
+    }
+  ],
+});
 
   const campaignId = campaign?.data?.id;
   if (!campaignId) throw new Error("MailerLite did not return a campaign id.");
