@@ -195,19 +195,21 @@ async function main() {
       const link = c.item.link || null;
       if (!link) continue;
 
-      const row = {
-        // IMPORTANT: satisfy your existing NOT NULL "title" column
-        title: c.title,
+const row = {
+  // Required legacy columns (your table enforces these)
+  title: c.title,
+  signal_type: c.category, // ✅ FIX: satisfy NOT NULL constraint
 
-        // Also store our richer fields (if columns exist)
-        headline: c.title,
-        summary: c.snippet || c.title,
-        category: c.category,
-        score: c.score,
-        source: src.source,
-        source_url: link,
-        published_at: c.item.pubDate ? new Date(c.item.pubDate).toISOString() : null
-      };
+  // Newer/richer columns (safe to keep even if unused later)
+  headline: c.title,
+  summary: c.snippet || c.title,
+  category: c.category,
+  score: c.score,
+  source: src.source,
+  source_url: link,
+  published_at: c.item.pubDate ? new Date(c.item.pubDate).toISOString() : null
+};
+
 
       const { error } = await upsertSignal(row);
 
