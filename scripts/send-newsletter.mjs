@@ -10,9 +10,10 @@ const FROM_NAME = process.env.MAILERLITE_FROM_NAME || "HireCRE";
 const FROM_EMAIL = process.env.MAILERLITE_FROM_EMAIL || "hirecre@a26cos.com";
 const REPLY_TO = process.env.MAILERLITE_REPLY_TO || FROM_EMAIL;
 
-// Preview mode
 const PREVIEW = process.env.PREVIEW === "1";
-const PREVIEW_EMAIL = (process.env.PREVIEW_EMAIL || "hirecre@a26cos.com").trim().toLowerCase();
+const PREVIEW_EMAIL = (process.env.PREVIEW_EMAIL || "hirecre@a26cos.com")
+  .trim()
+  .toLowerCase();
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -22,22 +23,25 @@ if (!MAILERLITE_API_TOKEN) {
   console.error("Missing MAILERLITE_API_TOKEN");
   process.exit(1);
 }
-if (!MAILERLITE_GROUP_ID) {
-  console.error("Missing MAILERLITE_GROUP_ID (create a Group in MailerLite and paste its id here)");
+// Only require GROUP_ID when NOT in preview
+if (!PREVIEW && !MAILERLITE_GROUP_ID) {
+  console.error(
+    "Missing MAILERLITE_GROUP_ID (create a Group in MailerLite and paste its id here)"
+  );
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-async function mlRequest(path, method, body) {
+async function mlPost(path, body) {
   const res = await fetch(`https://connect.mailerlite.com/api/${path}`, {
-    method,
+    method: "POST",
     headers: {
       Authorization: `Bearer ${MAILERLITE_API_TOKEN}`,
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: body ? JSON.stringify(body) : undefined,
+    body: JSON.stringify(body),
   });
 
   const text = await res.text();
@@ -56,12 +60,12 @@ async function mlRequest(path, method, body) {
   return json;
 }
 
-async function mlPost(path, body) {
-  return mlRequest(path, "POST", body);
-}
-
 async function ensureSentAtColumn() {
-  const { error } = await supabase.from("newsletter_issues").select("sent_at").limit(1);
+  const { error } = await supabase
+    .from("newsletter_issues")
+    .select("sent_at")
+    .limit(1);
+
   if (error) {
     throw new Error(
       "newsletter_issues.sent_at column is missing. Add it in Supabase SQL Editor:\n\n" +
@@ -82,7 +86,6 @@ async function getLatestUnsentIssue() {
   return data?.[0] ?? null;
 }
 
-// Preview mode should NOT mark sent
 async function markSent(id) {
   if (PREVIEW) {
     console.log("🧪 PREVIEW MODE — not marking issue as sent");
@@ -97,49 +100,6 @@ async function markSent(id) {
   if (error) throw error;
 }
 
-async function sendPreviewEmail({ subject, html }) {
-  if (!PREVIEW_EMAIL) throw new Error("PREVIEW_EMAIL is missing/blank.");
-
-  // Uses MailerLite "emails" endpoint (transactional-ish) to send a single test email.
-  // This avoids touching groups/subscribers and is safest for previews.
-  await mlPost("emails", {
-    subject,
-    from: FROM_EMAIL,
-    from_name: FROM_NAME,
-    reply_to: REPLY_TO,
-    to: [{ email: PREVIEW_EMAIL }],
-    html,
-  });
-
-  console.log(`🧪 PREVIEW MODE — sent preview to ${PREVIEW_EMAIL}`);
-}
-
-async function createAndSendCampaign({ name, subject, html }) {
-  // Create campaign (regular)
-  const campaign = await mlPost("campaigns", {
-    name,
-    type: "regular",
-    groups: [String(MAILERLITE_GROUP_ID)],
-    emails: [
-      {
-        subject,
-        from_name: FROM_NAME,
-        from: FROM_EMAIL,
-        reply_to: REPLY_TO,
-        content: html,
-      },
-    ],
-  });
-
-  const campaignId = campaign?.data?.id;
-  if (!campaignId) throw new Error("MailerLite did not return a campaign id.");
-
-  // Send now
-  await mlPost(`campaigns/${campaignId}/schedule`, { delivery: "instant" });
-
-  return campaignId;
-}
-
 async function main() {
   await ensureSentAtColumn();
 
@@ -152,20 +112,61 @@ async function main() {
     throw new Error("Issue is missing subject or html in Supabase.");
   }
 
-  const name = `HireCRE Newsletter ${issue.send_date}`;
-
+  // In preview mode, we send only to PREVIEW_EMAIL (no groups)
   if (PREVIEW) {
-    await sendPreviewEmail({ subject: issue.subject, html: issue.html });
-    // Do NOT schedule campaign, do NOT mark sent
-    console.log(`✅ Preview complete for send_date: ${issue.send_date}`);
+    console.log(`🧪 PREVIEW MODE — sending only to: ${PREVIEW_EMAIL}`);
+
+    const campaign = await mlPost("campaigns", {
+      name: `HireCRE Newsletter PREVIEW ${issue.send_date}`,
+      type: "regular",
+      emails: [
+        {
+          subject: `[PREVIEW] ${issue.subject}`,
+          from_name: FROM_NAME,
+          from: FROM_EMAIL,
+          reply_to: REPLY_TO,
+          content: issue.html,
+        },
+      ],
+      // MailerLite expects this for your account type (based on earlier errors)
+      // Single-recipient "emails" campaign
+      // IMPORTANT: Some accounts require "emails" to be a list of recipients;
+      // for yours, earlier we fixed it by supplying an "emails" array payload.
+      // Here we set the actual recipient as a one-off list.
+      recipients: [PREVIEW_EMAIL],
+    });
+
+    const campaignId = campaign?.data?.id;
+    if (!campaignId) throw new Error("MailerLite did not return a campaign id.");
+
+    await mlPost(`campaigns/${campaignId}/schedule`, { delivery: "instant" });
+
+    console.log("✅ Preview sent via MailerLite.");
+    console.log(`✅ send_date: ${issue.send_date}`);
+    console.log(`✅ campaign_id: ${campaignId}`);
     return;
   }
 
-  const campaignId = await createAndSendCampaign({
-    name,
-    subject: issue.subject,
-    html: issue.html,
+  // Production mode: send to your group subscribers
+  const campaign = await mlPost("campaigns", {
+    name: `HireCRE Newsletter ${issue.send_date}`,
+    type: "regular",
+    groups: [String(MAILERLITE_GROUP_ID)],
+    emails: [
+      {
+        subject: issue.subject,
+        from_name: FROM_NAME,
+        from: FROM_EMAIL,
+        reply_to: REPLY_TO,
+        content: issue.html,
+      },
+    ],
   });
+
+  const campaignId = campaign?.data?.id;
+  if (!campaignId) throw new Error("MailerLite did not return a campaign id.");
+
+  await mlPost(`campaigns/${campaignId}/schedule`, { delivery: "instant" });
 
   await markSent(issue.id);
 
