@@ -4,247 +4,219 @@ import Parser from "rss-parser";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const DEBUG = process.env.DEBUG === "1";
-
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  console.error("Missing Supabase env vars");
   process.exit(1);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-// rss-parser can be picky with some feeds; keep it simple.
 const parser = new Parser({
   timeout: 20000,
-  headers: {
-    "User-Agent": "HireCRE/1.0 (+https://hirecre.com)",
-    Accept: "application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7",
-  },
+  headers: { "User-Agent": "HireCRE-MarketSignals/1.0" }
 });
 
-/**
- * SOURCES
- * - Some sites don't publish RSS (or it's blocked). For those, we list "attempt" URLs.
- * - The script will try each URL, and skip the source if none work.
- *
- * Note: ConnectCRE RSS endpoints are from their own RSS page.
- */
-const SOURCES = [
-  {
-    source: "Bisnow",
-    urls: ["https://www.bisnow.com/rss"],
-  },
-  {
-    source: "Commercial Observer",
-    urls: ["https://commercialobserver.com/feed/"],
-  },
-  {
-    source: "ConnectCRE",
-    // from their RSS page
-    urls: [
-      "https://www.connectcre.com/feed/",
-      "https://www.connectcre.com/feed/rss/",
-      "https://www.connectcre.com/feed/atom/",
-    ],
-  },
+const DEBUG = process.env.DEBUG === "1";
 
-  // --- “attempts” (may or may not exist / may block bots) ---
-  // If these fail, we’ll later switch to HTML-scraping or another aggregator source.
-  { source: "REjournals", urls: ["https://rejournals.com/feed/", "https://rejournals.com/rss/"] },
-  { source: "Trepp", urls: ["https://www.trepp.com/blog/rss.xml", "https://www.trepp.com/rss.xml"] },
-  { source: "NAR Commercial", urls: ["https://www.nar.realtor/rss", "https://www.nar.realtor/taxonomy/term/??/feed"] },
+// --- RSS FEEDS (focus on CRE + research) ---
+const SOURCES = [
+  { source: "Bisnow", urls: ["https://www.bisnow.com/rss"] },
+  { source: "Commercial Observer", urls: ["https://commercialobserver.com/feed/"] },
+  { source: "ConnectCRE", urls: ["https://www.connectcre.com/feed/"] },
+  { source: "REjournals", urls: ["https://rejournals.com/feed/"] },
   { source: "Moody's CRE", urls: ["https://www.moodyscre.com/insights-and-research/feed/"] },
-  { source: "NAIOP Research", urls: ["https://www.naiop.org/rss/", "https://www.naiop.org/research-and-publications/rss/"] },
+
+  // Keep these listed but they may fail; script will skip gracefully
+  { source: "Trepp", urls: ["https://www.trepp.com/blog/rss.xml", "https://www.trepp.com/rss.xml"] },
+  { source: "NAR (generic RSS)", urls: ["https://www.nar.realtor/rss"] },
+  { source: "NAIOP (guess)", urls: ["https://www.naiop.org/rss/", "https://www.naiop.org/research-and-publications/rss/"] }
 ];
 
-/**
- * HARD FILTERS
- * We want COMMERCIAL real estate (not residential/mortgage-rate consumer news).
- */
-function isProbablyCRE(text) {
-  const t = (text || "").toLowerCase();
+// -----------------------
+// Helpers: CRE relevance + macro scoring
+// -----------------------
 
-  // Strong commercial indicators
-  const hasCommercial =
-    /\b(commercial real estate|cre)\b/.test(t) ||
-    /\b(multifamily|industrial|office|retail|hotel|hospitality|self-storage|datacenter|data center|life science|medical office)\b/.test(t) ||
-    /\b(tenant|leasing|lease|cap rate|noi|vacancy|absorption|rent growth)\b/.test(t) ||
-    /\b(cmbs|mbs|delinquen|special servicing|debt fund|bridge loan|refinanc|maturity wall)\b/.test(t);
-
-  // Residential / consumer indicators (exclude)
-  const isResidentialNoise =
-    /\b(single-family|single family|home sales|housing market|mortgage rates|realtor\.com|zillow)\b/.test(t) ||
-    /\b(first-time home|first time home|homebuyer|housing starts)\b/.test(t);
-
-  // If it screams residential, drop it.
-  if (isResidentialNoise) return false;
-
-  // Otherwise require at least some commercial signal.
-  return hasCommercial;
+function normalize(s) {
+  return (s || "").replace(/\s+/g, " ").trim();
 }
 
-/**
- * SCORING
- * Goal: boost macro & trend; punish transaction blotter headlines.
- */
-function scoreArticle(text) {
-  const t = (text || "").toLowerCase();
+function isCreRelevant(text) {
+  const t = text.toLowerCase();
+
+  // must contain at least one CRE-ish anchor term
+  const hasCreAnchor =
+    /(commercial real estate|cre\b|office|industrial|multifamily|retail|hotel|hospitality|self-storage|data center|life sciences|student housing|logistics|warehouse|cap rate|leasing|rent|vacancy|absorption|construction|development|zoning|tenant)/.test(
+      t
+    );
+
+  if (!hasCreAnchor) return false;
+
+  // exclude obvious residential / consumer housing
+  if (/(single-family|home sales|existing home|mortgage rates|realtor\.com|zillow|housing market\b|first-time home|homebuyer)/.test(t)) {
+    return false;
+  }
+
+  return true;
+}
+
+// We want macro/trend shaping pieces, not “$X loan for Y property” noise.
+// The scoring below rewards: research/indices/outlooks, sector trends, marketwide stats, distress/credit cycle,
+// and penalizes: single-asset deals, “provided $X loan”, “leased X SF to Y”, etc.
+function scoreMacro(text) {
+  const t = text.toLowerCase();
   let score = 0;
 
-  // --- MACRO / TREND BOOSTERS ---
-  if (/\b(outlook|forecast|guidance|scenario|baseline|headwinds|tailwinds)\b/.test(t)) score += 6;
-  if (/\b(cap rates?|valuation|pricing|liquidity|bid-ask|spreads?)\b/.test(t)) score += 6;
-  if (/\b(vacancy|absorption|rent growth|asking rents?)\b/.test(t)) score += 6;
-  if (/\b(maturity wall|refinanc|extensions?|loan workouts?)\b/.test(t)) score += 6;
-  if (/\b(cmbs|special servicing|delinquenc|distress|defaults?)\b/.test(t)) score += 6;
-  if (/\b(fed|rates?|sofr|treasur(y|ies)|inflation)\b/.test(t)) score += 3; // lower weight; can be generic
+  // Strong macro/research signals
+  if (/(report|outlook|forecast|survey|index|cpi|pce|fed|rates|sofr|treasury|spread|basis points|bp\b|cap rates|vacancy|absorption|rent growth|delinquen|special servicing|cmbs|maturity wall|refinanc|distress|workout|defaults)/.test(t)) {
+    score += 8;
+  }
 
-  // CRE sectors (small boost)
-  if (/\b(multifamily|industrial|office|retail|hotel|data center|datacenter|self-storage|life science)\b/.test(t))
+  // Sector-level / market-level wording
+  if (/(market|national|nationwide|across the u\.s\.|u\.s\.|global|regional|pipeline|cycle|trend|momentum|recovery|headwind|tailwind)/.test(t)) {
+    score += 5;
+  }
+
+  // Asset class + macro framing
+  if (/(office|industrial|multifamily|retail|data center|hotel|hospitality|self-storage|life sciences)/.test(t)) {
+    score += 3;
+  }
+
+  // Firm expansions / platform moves / layoffs (still macro-ish)
+  if (/(expansion|opens|launches|new office|platform|strategy shift|restructur|layoff|cuts|bankruptcy|chapter 11|wind down)/.test(t)) {
     score += 2;
+  }
 
-  // --- DEAL-BLOTTER PENALTIES (what you called “noise”) ---
-  // Penalize specific financings / acquisitions unless they also contain macro words above.
-  if (/\b(provides?|provided|lends?|loan|construction loan|acquisition financing)\b/.test(t)) score -= 6;
-  if (/\b(buys?|acquires?|sold for|purchased for)\b/.test(t)) score -= 6;
+  // Penalties: single-deal noise
+  if (/(provides|lends|arranges|secures)\s+\$?\d+/.test(t)) score -= 8;
+  if (/\$\d+(\.\d+)?\s*(m|mm|million|b|bb|billion)\b/.test(t)) score -= 4; // money alone is often deal noise
+  if (/(buys|acquires|sells|sale|purchases)\s+\d+/.test(t)) score -= 5; // “buys 123 Main St” type
+  if (/(leased|lease|tenant|snags|takes|signs)\s+\d+/.test(t)) score -= 6; // leasing announcements
+  if (/(100k sf|50k sf|\d+\s*sf\b)/.test(t)) score -= 6;
 
-  // Dollar amounts are often transaction blotter
-  if (/\$\s?\d/.test(t) || /\b\d+(\.\d+)?\s?(million|billion)\b/.test(t)) score -= 4;
-
-  // Address / very specific property indicator (often a one-off deal)
-  if (/\b\d{2,5}\s+\w+(\s+\w+){0,3}\s+(street|st|avenue|ave|road|rd|boulevard|blvd)\b/.test(t)) score -= 6;
-
-  // “Hires / appoints / joins” is HR gossip, not market signal
-  if (/\b(appoints?|hired|hires?|joins?|named|promoted)\b/.test(t)) score -= 8;
+  // Extra penalty: people moves / hires
+  if (/(appoints|hires|joins as|named|promoted|chief .* officer|ceo|cfo|coo)/.test(t)) score -= 12;
 
   return score;
 }
 
-/**
- * CLASSIFICATION
- * You said you want:
- * expansions + capital/fundraising + asset-class momentum + layoffs
- * ...but combined into ONE section in the newsletter.
- *
- * We’ll still store a category for filtering later, but this is broader and macro-friendly.
- */
 function classify(text) {
-  const t = (text || "").toLowerCase();
+  const t = text.toLowerCase();
 
-  if (/\b(layoffs?|job cuts?|retrench|hiring freeze|bankrupt|chapter 11|restructur)\b/.test(t)) return "contraction";
-  if (/\b(fundraise|raises?|raises? \d|closes? \d|closed|capital raise|new fund|final close)\b/.test(t)) return "capital";
-  if (/\b(expands?|expansion|opens?|opening|launches?|new market|new office)\b/.test(t)) return "expansion";
-  if (/\b(momentum|surge|accelerat|rebounds?|outperform|record (year|quarter)|strong demand)\b/.test(t)) return "momentum";
-
-  // Macro “market signal” bucket
-  if (/\b(outlook|forecast|cap rates?|vacancy|absorption|rent growth|delinquenc|special servicing|maturity wall)\b/.test(t))
+  // Macro/trend bucket should catch most of what we want
+  if (/(report|outlook|forecast|survey|index|cap rates|vacancy|absorption|rent growth|distress|cmbs|delinquen|special servicing|maturity wall|refinanc|credit|lending|rates|sofr|treasury|spread|basis points|bp\b)/.test(t)) {
     return "macro";
+  }
+
+  // Secondary tags (still included in same newsletter section later)
+  if (/(raise|fund|capital|financing|closes|raises|raises \$|fundraising)/.test(t)) return "capital";
+  if (/(expand|launch|open|new office|platform)/.test(t)) return "expansion";
+  if (/(surge|demand|growth|outperform|rebound|recovery|improving|tightening)/.test(t)) return "momentum";
+  if (/(layoff|cuts|retrench|wind down|bankruptcy|chapter 11|restructur)/.test(t)) return "contraction";
 
   return null;
 }
 
-function pickPublishedAt(item) {
-  return item.isoDate || item.pubDate || item.published || null;
-}
-
-async function tryParseFeed(url) {
-  const parsed = await parser.parseURL(url);
-  return parsed;
+async function parseFirstWorkingUrl(sourceName, urls) {
+  for (const url of urls) {
+    try {
+      if (DEBUG) console.log(`Trying feed: ${sourceName} -> ${url}`);
+      const parsed = await parser.parseURL(url);
+      if (DEBUG) console.log(`✅ Parsed ${parsed.items?.length || 0} items from ${sourceName} (${url})`);
+      return { url, parsed };
+    } catch (e) {
+      const msg = e?.message || String(e);
+      if (DEBUG) console.log(`  ❌ Failed: ${url} :: ${msg}`);
+    }
+  }
+  return null;
 }
 
 async function upsertSignal(row) {
-  // If you have a unique constraint on (source_url), this will prevent duplicates.
-  // If you don't, it will still work but may insert dupes.
-  const { error } = await supabase
+  // Uses your unique index on source_url
+  return supabase
     .from("market_signals")
     .upsert(row, { onConflict: "source_url" });
-
-  return error;
 }
 
 async function main() {
   let inserted = 0;
   const skippedSources = [];
 
-  for (const s of SOURCES) {
-    let parsed = null;
-    let usedUrl = null;
+  for (const src of SOURCES) {
+    const result = await parseFirstWorkingUrl(src.source, src.urls);
 
-    for (const url of s.urls) {
-      try {
-        console.log(`Trying feed: ${s.source} -> ${url}`);
-        parsed = await tryParseFeed(url);
-        usedUrl = url;
-        console.log(`✅ Parsed ${parsed.items?.length ?? 0} items from ${s.source} (${url})`);
-        break;
-      } catch (e) {
-        console.log(`  ❌ Failed: ${url} :: ${e?.message ?? e}`);
-      }
-    }
-
-    if (!parsed) {
-      console.log(`🚫 Skipping entire source: ${s.source}`);
-      skippedSources.push(s.source);
+    if (!result) {
+      skippedSources.push(src.source);
+      if (DEBUG) console.log(`🚫 Skipping entire source: ${src.source}`);
       continue;
     }
 
-    // Score candidates
-    const candidates = (parsed.items || [])
-      .slice(0, 40)
-      .map((item) => {
-        const text = `${item.title || ""} ${item.contentSnippet || ""} ${item.content || ""}`;
-        const category = classify(text);
-        const score = scoreArticle(text);
-        const creOk = isProbablyCRE(text);
+    const { parsed, url: workingUrl } = result;
 
-        return { item, text, category, score, creOk };
+    // Score + pick top candidates for debugging
+    const scored = (parsed.items || [])
+      .slice(0, 30)
+      .map((item) => {
+        const title = normalize(item.title);
+        const snippet = normalize(item.contentSnippet || item.content || "");
+        const text = `${title} ${snippet}`.trim();
+
+        const category = classify(text);
+        const creOk = isCreRelevant(text);
+        const score = scoreMacro(text);
+
+        return {
+          item,
+          title,
+          snippet,
+          text,
+          category,
+          creOk,
+          score
+        };
       })
-      .filter((x) => x.creOk && x.category) // must be CRE-ish and classifiable
       .sort((a, b) => b.score - a.score);
 
-    // Threshold: higher = more macro, less noise
-    const THRESHOLD = 8;
-
-    // Insert a limited number per source to keep noise down
-    const toInsert = candidates
-      .filter((x) => x.score >= THRESHOLD)
-      .slice(0, 10);
-
     if (DEBUG) {
-      console.log(`Top candidates for ${s.source} (from ${usedUrl}):`);
-      for (const c of candidates.slice(0, 8)) {
-        console.log(
-          `  score=${c.score} category=${c.category} creOk=${c.creOk} :: ${c.item.title}`
-        );
+      console.log(`Top candidates for ${src.source} (from ${workingUrl}):`);
+      for (const c of scored.slice(0, 3)) {
+        console.log(`  score=${c.score} category=${c.category} creOk=${c.creOk} :: ${c.title}`);
       }
-      if (!toInsert.length) console.log(`  (none met threshold ${THRESHOLD})`);
     }
 
-    for (const c of toInsert) {
-      const item = c.item;
+    for (const c of scored) {
+      // Must be CRE and must be macro-ish
+      if (!c.creOk) continue;
+      if (!c.category) continue;
 
-      const headline = (item.title || "").trim();
-      const source_url = item.link || item.guid || null;
-      if (!headline || !source_url) continue;
+      // Threshold: tune this if too few items.
+      // Macro scoring is harsh on deal-noise by design.
+      if (c.score < 8) continue;
 
-      const published_at = pickPublishedAt(item);
-
-      // Keep summary short; your email template can rewrite it later if needed.
-      const summary = headline.replace(/\.$/, "") + ".";
+      const link = c.item.link || null;
+      if (!link) continue;
 
       const row = {
-        headline,
-        summary,
+        // IMPORTANT: satisfy your existing NOT NULL "title" column
+        title: c.title,
+
+        // Also store our richer fields (if columns exist)
+        headline: c.title,
+        summary: c.snippet || c.title,
         category: c.category,
         score: c.score,
-        source: s.source,
-        source_url,
-        published_at,
+        source: src.source,
+        source_url: link,
+        published_at: c.item.pubDate ? new Date(c.item.pubDate).toISOString() : null
       };
 
-      const err = await upsertSignal(row);
-      if (!err) inserted++;
-      else if (DEBUG) console.log(`  upsert error for ${source_url}: ${err.message}`);
+      const { error } = await upsertSignal(row);
+
+      if (error) {
+        if (DEBUG) console.log(`  upsert error for ${link}: ${error.message || error}`);
+        continue;
+      }
+
+      inserted++;
     }
   }
 
@@ -253,6 +225,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error("❌ fetch-market-signals failed:", e?.message ?? e);
+  console.error("❌ fetch-market-signals failed:", e);
   process.exit(1);
 });
