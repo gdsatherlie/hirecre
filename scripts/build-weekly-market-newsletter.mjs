@@ -14,22 +14,20 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // --- CONFIG ---
-const PICKS = 8;         // how many items in the weekly issue
-const MIN_SCORE = 12;    // raise if you still see “deal noise”
-const LOOKBACK_DAYS = 7; // weekly window
+const PICKS = 8;
+const MIN_SCORE = 12;
+const LOOKBACK_DAYS = 7;
 const OUTPUT_DIR = "newsletters";
 
 // --- date helpers (UTC) ---
 function yyyyMmDd(d) {
   return d.toISOString().slice(0, 10);
 }
-
 function startOfTodayUTC() {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
   return d;
 }
-
 function daysAgoUTC(n) {
   const d = startOfTodayUTC();
   d.setUTCDate(d.getUTCDate() - n);
@@ -96,11 +94,13 @@ function renderHTML({ issueDate, title, items }) {
 }
 
 async function main() {
-  const issueDate = yyyyMmDd(startOfTodayUTC()); // "YYYY-MM-DD"
+  const issueDate = yyyyMmDd(startOfTodayUTC()); // YYYY-MM-DD
   const sinceISO = daysAgoUTC(LOOKBACK_DAYS).toISOString();
 
+  // You can change these any time:
   const title = `HireCRE — Weekly Macro Signals`;
-  const send_date = issueDate; // ✅ required NOT NULL column from your error
+  const subject = `HireCRE — Weekly Macro Signals (${issueDate})`; // ✅ REQUIRED (NOT NULL)
+  const send_date = issueDate; // ✅ REQUIRED (NOT NULL)
   const generated_at = new Date().toISOString();
   const status = "draft";
 
@@ -121,20 +121,15 @@ async function main() {
     process.exit(0);
   }
 
-  // 2) Create/Upsert newsletter issue row
-  // We include send_date ALWAYS to satisfy NOT NULL.
-  // We also include title/status/generate_at because your earlier errors referenced these columns.
+  // 2) Create/Upsert the issue row
   const issuePayload = {
-    send_date,       // ✅ MUST NOT BE NULL
+    send_date,
+    subject,      // ✅ FIX
     title,
     status,
     generated_at,
-    // Optional: if your table has issue_date and you want it:
-    // issue_date: issueDate,
   };
 
-  // If your table has a UNIQUE constraint on send_date, this works great.
-  // If not, you'll get an onConflict error and we’ll adjust to your real unique key.
   const { data: issueRow, error: issueErr } = await supabase
     .from("newsletter_issues")
     .upsert(issuePayload, { onConflict: "send_date" })
@@ -144,7 +139,7 @@ async function main() {
   if (issueErr) throw issueErr;
   const issueId = issueRow.id;
 
-  // 3) Insert/Upsert issue items (positions)
+  // 3) Insert issue items
   const itemsToInsert = signals.map((s, i) => ({
     issue_id: issueId,
     market_signal_id: s.id,
@@ -157,7 +152,7 @@ async function main() {
 
   if (itemsErr) throw itemsErr;
 
-  // 4) Generate HTML preview file
+  // 4) Write HTML preview
   const html = renderHTML({
     issueDate,
     title,
@@ -177,8 +172,6 @@ async function main() {
   console.log(`✅ Built weekly issue preview: ${outPath}`);
   console.log(`Issue ID: ${issueId}`);
   console.log(`Items: ${signals.length}`);
-  console.log("\nNEXT STEP:");
-  console.log("If the preview looks good, we will 'freeze' these picks by marking used_in_issue=true (finalize step).");
 }
 
 main().catch((e) => {
