@@ -117,19 +117,27 @@ async function main() {
     process.exit(0);
   }
 
-  // 2) Create/Upsert the issue row
-  const { data: issueRow, error: issueErr } = await supabase
-    .from("newsletter_issues")
-    .upsert(
-      { issue_date: issueDate, title, generated_at: new Date().toISOString() },
-      { onConflict: "issue_date" }
-    )
-    .select("id")
-    .single();
 
-  if (issueErr) throw issueErr;
+  // 2) Create/Upsert the issue row (avoid schema-cache issues by only writing known columns)
+const { data: issueRow, error: issueErr } = await supabase
+  .from("newsletter_issues")
+  .upsert(
+    { issue_date: issueDate, title }, // <-- keep minimal
+    { onConflict: "issue_date" }
+  )
+  .select("id")
+  .single();
 
-  const issueId = issueRow.id;
+if (issueErr) throw issueErr;
+
+const issueId = issueRow.id;
+
+// (optional) best-effort timestamp update (won’t break if cache lags)
+await supabase
+  .from("newsletter_issues")
+  .update({ generated_at: new Date().toISOString() })
+  .eq("id", issueId);
+
 
   // 3) Insert issue items (positions)
   const itemsToInsert = signals.map((s, i) => ({
