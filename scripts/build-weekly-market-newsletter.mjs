@@ -1,3 +1,4 @@
+// scripts/build-weekly-market-newsletter.mjs
 import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
@@ -12,13 +13,13 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// --- CONFIG (tune these later) ---
-const PICKS = 8;                // how many items in the weekly issue
-const MIN_SCORE = 12;           // raise this if you still see “deal noise”
-const LOOKBACK_DAYS = 7;        // weekly window
+// --- CONFIG ---
+const PICKS = 8;         // how many items in the weekly issue
+const MIN_SCORE = 12;    // raise if you still see “deal noise”
+const LOOKBACK_DAYS = 7; // weekly window
 const OUTPUT_DIR = "newsletters";
 
-// Simple date helpers (UTC)
+// --- date helpers (UTC) ---
 function yyyyMmDd(d) {
   return d.toISOString().slice(0, 10);
 }
@@ -35,6 +36,7 @@ function daysAgoUTC(n) {
   return d;
 }
 
+// --- html helpers ---
 function esc(s = "") {
   return String(s)
     .replaceAll("&", "&amp;")
@@ -43,7 +45,6 @@ function esc(s = "") {
     .replaceAll('"', "&quot;");
 }
 
-// Minimal HTML template (you can style later)
 function renderHTML({ issueDate, title, items }) {
   const rows = items
     .map(
@@ -95,16 +96,19 @@ function renderHTML({ issueDate, title, items }) {
 }
 
 async function main() {
-  const issueDate = yyyyMmDd(startOfTodayUTC());
-  const since = daysAgoUTC(LOOKBACK_DAYS).toISOString();
+  const issueDate = yyyyMmDd(startOfTodayUTC()); // "YYYY-MM-DD"
+  const sinceISO = daysAgoUTC(LOOKBACK_DAYS).toISOString();
 
   const title = `HireCRE — Weekly Macro Signals`;
+  const send_date = issueDate; // ✅ required NOT NULL column from your error
+  const generated_at = new Date().toISOString();
+  const status = "draft";
 
   // 1) Pull top candidates
   const { data: signals, error: sigErr } = await supabase
     .from("market_signals")
     .select("id, title, source, signal_type, score, url, created_at, used_in_issue")
-    .gte("created_at", since)
+    .gte("created_at", sinceISO)
     .eq("used_in_issue", false)
     .gte("score", MIN_SCORE)
     .order("score", { ascending: false })
@@ -117,29 +121,30 @@ async function main() {
     process.exit(0);
   }
 
+  // 2) Create/Upsert newsletter issue row
+  // We include send_date ALWAYS to satisfy NOT NULL.
+  // We also include title/status/generate_at because your earlier errors referenced these columns.
+  const issuePayload = {
+    send_date,       // ✅ MUST NOT BE NULL
+    title,
+    status,
+    generated_at,
+    // Optional: if your table has issue_date and you want it:
+    // issue_date: issueDate,
+  };
 
-  // 2) Create/Upsert the issue row (avoid schema-cache issues by only writing known columns)
-const { data: issueRow, error: issueErr } = await supabase
-  .from("newsletter_issues")
-  .upsert(
-    { issue_date: issueDate, title }, // <-- keep minimal
-    { onConflict: "issue_date" }
-  )
-  .select("id")
-  .single();
+  // If your table has a UNIQUE constraint on send_date, this works great.
+  // If not, you'll get an onConflict error and we’ll adjust to your real unique key.
+  const { data: issueRow, error: issueErr } = await supabase
+    .from("newsletter_issues")
+    .upsert(issuePayload, { onConflict: "send_date" })
+    .select("id")
+    .single();
 
-if (issueErr) throw issueErr;
+  if (issueErr) throw issueErr;
+  const issueId = issueRow.id;
 
-const issueId = issueRow.id;
-
-// (optional) best-effort timestamp update (won’t break if cache lags)
-await supabase
-  .from("newsletter_issues")
-  .update({ generated_at: new Date().toISOString() })
-  .eq("id", issueId);
-
-
-  // 3) Insert issue items (positions)
+  // 3) Insert/Upsert issue items (positions)
   const itemsToInsert = signals.map((s, i) => ({
     issue_id: issueId,
     market_signal_id: s.id,
@@ -152,7 +157,7 @@ await supabase
 
   if (itemsErr) throw itemsErr;
 
-  // 4) Generate HTML preview file (DRY RUN output)
+  // 4) Generate HTML preview file
   const html = renderHTML({
     issueDate,
     title,
@@ -172,10 +177,8 @@ await supabase
   console.log(`✅ Built weekly issue preview: ${outPath}`);
   console.log(`Issue ID: ${issueId}`);
   console.log(`Items: ${signals.length}`);
-
   console.log("\nNEXT STEP:");
-  console.log("If the preview looks good, we will 'freeze' these picks by marking used_in_issue=true.");
-  console.log("That becomes Step 4 (finalize).");
+  console.log("If the preview looks good, we will 'freeze' these picks by marking used_in_issue=true (finalize step).");
 }
 
 main().catch((e) => {
