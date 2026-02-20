@@ -6,10 +6,10 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/board", label: "Jobs" },
   { href: "/alerts", label: "Alerts" },
-  { href: "/resources", label: "Resources" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
   { href: "/login", label: "Login" },
+  { href: "/resources", label: "Resources" },
 ];
 
 export default function SiteHeader() {
