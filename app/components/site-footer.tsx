@@ -8,8 +8,7 @@ export default function SiteFooter() {
         <div>
           <div className="text-base font-extrabold tracking-tight">HireCRE</div>
           <p className="mt-2 text-sm text-slate-600">
-            A clean feed of commercial real estate roles aggregated from public job
-            boards (starting with Greenhouse).
+            A clean feed of commercial real estate roles aggregated from public job boards.
           </p>
           <p className="mt-3 text-sm text-slate-600">
             Contact:{" "}
@@ -30,32 +29,61 @@ export default function SiteFooter() {
           <div className="text-sm font-semibold text-slate-900">Pages</div>
           <ul className="mt-3 space-y-2 text-sm sm:ml-auto sm:inline-block">
             <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/">
+              <Link
+                className="text-slate-600 hover:text-slate-900 hover:underline"
+                href="/"
+              >
                 Home
               </Link>
             </li>
             <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/board">
+              <Link
+                className="text-slate-600 hover:text-slate-900 hover:underline"
+                href="/board"
+              >
                 Jobs
               </Link>
             </li>
+
+            {/* NEW */}
             <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/about">
+              <Link
+                className="text-slate-600 hover:text-slate-900 hover:underline"
+                href="/resources"
+              >
+                Resources
+              </Link>
+            </li>
+
+            <li>
+              <Link
+                className="text-slate-600 hover:text-slate-900 hover:underline"
+                href="/about"
+              >
                 About
               </Link>
             </li>
             <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/contact">
+              <Link
+                className="text-slate-600 hover:text-slate-900 hover:underline"
+                href="/contact"
+              >
                 Contact
               </Link>
             </li>
             <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/privacy">
+              <Link
+                className="text-slate-600 hover:text-slate-900 hover:underline"
+                href="/privacy"
+              >
                 Privacy
               </Link>
             </li>
             <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/terms">
+              <Link
+                className="text-slate-600 hover:text-slate-900 hover:underline"
+                href="/terms"
+              >
                 Terms
               </Link>
             </li>
