@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, BottomCtas, Grid } from "../_components";
+import { PageShell, Section, Card, Callout, List, BottomCtas, Grid, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "Construction Budget 101 | HireCRE",
@@ -47,6 +47,15 @@ export default function ConstructionBudget101() {
         </Callout>
       </Section>
 
+
+      <RelatedLinks
+  items={[
+    { title: "Development Interview Questions", href: "/interview-prep/development-interview-questions" },
+    { title: "Development Returns (Yield-on-Cost)", href: "/interview-prep/development-returns-yoc" },
+    { title: "Risk & Structure Playbook", href: "/interview-prep/risk-and-structure" },
+  ]}
+/>
+      
       <BottomCtas />
     </PageShell>
   );
