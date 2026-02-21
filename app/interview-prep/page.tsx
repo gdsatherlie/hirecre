@@ -1,123 +1,101 @@
-import Link from "next/link";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
+export const metadata = {
   title: "Interview Prep | HireCRE",
   description:
-    "Practical, technical CRE interview prep for debt, acquisitions, asset management, and underwriting.",
+    "Lender-grade commercial real estate interview prep: bridge lending, debt yield, underwriting walkthroughs, sponsor risk, and mini-case practice.",
 };
 
-const ITEMS = [
+type PrepCard = {
+  title: string;
+  description: string;
+  href: string;
+};
+
+const PREP_CARDS: PrepCard[] = [
   {
     title: "Bridge Lending Interview Questions",
+    description:
+      "Real prompts + what they’re testing: sizing, exit risk, sponsor evaluation, and structure.",
     href: "/interview-prep/bridge-lending-questions",
-    desc: "Sizing, structure, refinance risk, sponsor questions, and how to answer like a pro.",
-    tag: "Debt / Originations",
   },
   {
     title: "Debt Yield Explained (With Example)",
+    description:
+      "How lenders actually use debt yield for sizing, what NOI to use, and how it ties to exit risk.",
     href: "/interview-prep/debt-yield-explained",
-    desc: "What debt yield is, why it matters, and how lenders actually use it.",
-    tag: "Core Concepts",
   },
   {
     title: "Walk Me Through Your Underwriting",
+    description:
+      "A lender-grade script: deal story → NOI build → sizing → exit → risks → structure.",
     href: "/interview-prep/underwriting-walkthrough",
-    desc: "A clean, confident script for the most common technical interview prompt.",
-    tag: "Underwriting",
   },
   {
     title: "Evaluating Sponsor Risk",
+    description:
+      "A practical scorecard: liquidity vs exposure, track record, ops bench, concentration, and red flags.",
     href: "/interview-prep/sponsor-risk-analysis",
-    desc: "What makes a sponsor institutional and the red flags interviewers listen for.",
-    tag: "Credit / Risk",
   },
   {
     title: "CRE Mini Case Practice",
+    description:
+      "A mock deal + a 60–90 second model answer that sounds senior and credit-focused.",
     href: "/interview-prep/mini-case-practice",
-    desc: "A short mock deal + how to talk through it like a VP.",
-    tag: "Case Practice",
   },
 ];
 
-export default function InterviewPrepHub() {
+function PrepSection({ title, items }: { title: string; items: PrepCard[] }) {
   return (
-    <main className="max-w-5xl mx-auto px-6 py-14">
-      {/* Top */}
-      <div className="mb-10">
-        <p className="text-sm text-gray-500 mb-3">
-          <Link href="/resources" className="hover:underline">
-            Resources
-          </Link>{" "}
-          <span className="mx-2">/</span>
-          <span>Interview Prep</span>
-        </p>
-
-        <h1 className="text-4xl font-semibold tracking-tight mb-4">
-          Interview Prep
-        </h1>
-
-        <p className="text-lg text-gray-600 max-w-3xl">
-          Practical, technical prep for commercial real estate interviews — debt,
-          acquisitions, underwriting, and risk. Built to help you answer like
-          you’ve done the job.
-        </p>
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/board"
-            className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 transition"
-          >
-            Browse Jobs
-          </Link>
-          <Link
-            href="/alerts"
-            className="rounded-lg bg-black text-white px-4 py-2 text-sm hover:opacity-90 transition"
-          >
-            Get Weekly Alerts
-          </Link>
-        </div>
-      </div>
-
-      {/* Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {ITEMS.map((item) => (
-          <Link
-            key={item.href}
+    <section className="mt-12">
+      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+      <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => (
+          <a
+            key={item.title}
             href={item.href}
-            className="group rounded-2xl border bg-white p-6 hover:shadow-sm transition"
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="text-xl font-semibold leading-snug">
-                {item.title}
-              </h2>
-              <span className="text-xs text-gray-500 border rounded-full px-2 py-1 whitespace-nowrap">
-                {item.tag}
-              </span>
-            </div>
-            <p className="mt-3 text-gray-600">{item.desc}</p>
-            <p className="mt-5 text-sm font-medium text-gray-900 group-hover:underline">
-              Read →
-            </p>
-          </Link>
+            <div className="font-semibold text-slate-900">{item.title}</div>
+            <div className="mt-2 text-sm text-slate-600">{item.description}</div>
+          </a>
         ))}
-      </section>
+      </div>
+    </section>
+  );
+}
 
-      {/* Bottom CTA */}
-      <section className="mt-12 rounded-2xl border bg-gray-50 p-7">
-        <h3 className="text-xl font-semibold mb-2">
-          Want new roles + prep in one email?
-        </h3>
-        <p className="text-gray-600 mb-5">
-          Get the HireCRE weekly — top jobs, interview prompts, and what’s hiring.
+export default function InterviewPrepHubPage() {
+  return (
+    <main className="mx-auto max-w-6xl px-4 py-12">
+      <header>
+        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+          CRE Interview Prep
+        </h1>
+        <p className="mt-3 max-w-2xl text-base text-slate-600">
+          Lender-grade interview prep for commercial real estate roles — focused on
+          bridge lending, underwriting judgment, sponsor risk, and how to talk through
+          deals clearly under pressure.
         </p>
-        <Link
+      </header>
+
+      <PrepSection title="🧠 Interview Prep Hub" items={PREP_CARDS} />
+
+      <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="font-semibold text-slate-900">Want weekly CRE roles + prep?</div>
+        <div className="mt-2 text-sm text-slate-600">
+          Get top jobs and short technical prompts delivered weekly.
+        </div>
+        <a
           href="/alerts"
-          className="inline-flex rounded-lg bg-black text-white px-5 py-3 text-sm hover:opacity-90 transition"
+          className="mt-4 inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         >
           Subscribe to Alerts
-        </Link>
-      </section>
+        </a>
+      </div>
+
+      <div className="mt-12 text-xs text-slate-500">
+        Note: This content is educational and general in nature. Always tailor your
+        answers to the role, asset type, and the firm’s strategy.
+      </div>
     </main>
   );
 }
