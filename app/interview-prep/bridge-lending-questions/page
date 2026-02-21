@@ -1,1 +1,47 @@
+export default function BridgeLendingQuestions() {
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-16">
+      <h1 className="text-4xl font-bold mb-6">
+        Bridge Lending Interview Questions
+      </h1>
 
+      <p className="text-lg text-gray-600 mb-10">
+        Debt originations interviews test how you think about leverage, risk,
+        exit strategy, and sponsor quality — not just formulas.
+      </p>
+
+      <h2 className="text-2xl font-semibold mt-10 mb-4">
+        What Debt Teams Actually Care About
+      </h2>
+
+      <ul className="list-disc pl-6 space-y-2">
+        <li>Minimum debt yield</li>
+        <li>Exit cap rate assumptions</li>
+        <li>Business plan credibility</li>
+        <li>Sponsor liquidity and track record</li>
+        <li>Refinance risk in 24–36 months</li>
+      </ul>
+
+      <h2 className="text-2xl font-semibold mt-10 mb-4">
+        Common Technical Questions
+      </h2>
+
+      <ul className="list-disc pl-6 space-y-2">
+        <li>How do you size a loan?</li>
+        <li>What’s your minimum debt yield and why?</li>
+        <li>What happens if cap rates widen 50bps?</li>
+        <li>How do you evaluate rate risk?</li>
+        <li>What is more important: DSCR or debt yield?</li>
+      </ul>
+
+      <h2 className="text-2xl font-semibold mt-10 mb-4">
+        How to Answer Like a Professional
+      </h2>
+
+      <p className="mb-6">
+        Start with NOI stability, test downside vacancy, size to minimum
+        debt yield, then confirm refinance viability at stabilization.
+      </p>
+    </div>
+  );
+}
