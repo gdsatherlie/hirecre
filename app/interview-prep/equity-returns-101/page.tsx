@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, MiniMath, BottomCtas, Grid } from "../_components";
+import { PageShell, Section, Card, Callout, List, MiniMath, BottomCtas, Grid, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "Equity Returns 101 (IRR vs MOIC) | HireCRE",
@@ -59,6 +59,14 @@ export default function EquityReturns101() {
         </Grid>
       </Section>
 
+      <RelatedLinks
+  items={[
+    { title: "Equity Waterfall Basics", href: "/interview-prep/equity-waterfall-basics" },
+    { title: "REPE Interview Questions", href: "/interview-prep/repe-interview-questions" },
+    { title: "Exit Underwriting (Refi + Sale)", href: "/interview-prep/exit-underwriting" },
+  ]}
+/>
+      
       <BottomCtas />
     </PageShell>
   );
