@@ -92,20 +92,17 @@ const MODELING: Resource[] = [
 const CERTIFICATIONS: Resource[] = [
   {
     title: "CCIM Institute",
-    description:
-      "Commercial real estate investment designation.",
+    description: "Commercial real estate investment designation.",
     href: "https://www.ccim.com/",
   },
   {
     title: "NAIOP Education",
-    description:
-      "Commercial real estate development & investment programs.",
+    description: "Commercial real estate development & investment programs.",
     href: "https://www.naiop.org/",
   },
   {
     title: "Urban Land Institute (ULI)",
-    description:
-      "Global real estate development and land use organization.",
+    description: "Global real estate development and land use organization.",
     href: "https://uli.org/",
   },
 ];
@@ -113,36 +110,38 @@ const CERTIFICATIONS: Resource[] = [
 const RESEARCH: Resource[] = [
   {
     title: "NAREIT",
-    description:
-      "Public REIT data, performance metrics, and research.",
+    description: "Public REIT data, performance metrics, and research.",
     href: "https://www.reit.com/",
   },
   {
     title: "CBRE Research",
-    description:
-      "Global commercial real estate research reports.",
+    description: "Global commercial real estate research reports.",
     href: "https://www.cbre.com/insights",
   },
   {
     title: "JLL Research",
-    description:
-      "Commercial property market research and analysis.",
+    description: "Commercial property market research and analysis.",
     href: "https://www.us.jll.com/en/trends-and-insights/research",
   },
   {
     title: "Trepp",
-    description:
-      "CMBS data, debt analytics, and credit performance.",
+    description: "CMBS data, debt analytics, and credit performance.",
     href: "https://www.trepp.com/",
   },
 ];
 
 const INTERVIEW: Resource[] = [
   {
-    title: "CRE Technical Interview Prep",
+    title: "CRE Interview Prep Hub",
     description:
-      "Technical questions, underwriting concepts, key formulas, and modeling expectations.",
+      "Role-based prep across debt, equity, acquisitions, asset management, development, leasing, and operations.",
     href: "/interview-prep",
+  },
+  {
+    title: "Interview Prep Sitemap",
+    description:
+      "A complete index of every interview prep page (great for browsing and bookmarking).",
+    href: "/interview-prep/sitemap",
   },
 ];
 
@@ -151,26 +150,31 @@ function Section({ title, items }: { title: string; items: Resource[] }) {
     <section className="mt-12">
       <h2 className="text-xl font-bold text-slate-900">{title}</h2>
       <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((item) => (
-          <a
-            key={item.title}
-            href={item.href}
-            target="_blank"
-            rel={
-              item.affiliate
-                ? "noopener noreferrer nofollow"
-                : "noopener noreferrer"
-            }
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            <div className="font-semibold text-slate-900">
-              {item.title}
-            </div>
-            <div className="mt-2 text-sm text-slate-600">
-              {item.description}
-            </div>
-          </a>
-        ))}
+        {items.map((item) => {
+          const isInternal =
+            item.href.startsWith("/") || item.href.startsWith("#");
+
+          return (
+            <a
+              key={item.title}
+              href={item.href}
+              target={isInternal ? undefined : "_blank"}
+              rel={
+                isInternal
+                  ? undefined
+                  : item.affiliate
+                    ? "noopener noreferrer nofollow"
+                    : "noopener noreferrer"
+              }
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="font-semibold text-slate-900">{item.title}</div>
+              <div className="mt-2 text-sm text-slate-600">
+                {item.description}
+              </div>
+            </a>
+          );
+        })}
       </div>
     </section>
   );
