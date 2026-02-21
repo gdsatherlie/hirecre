@@ -5,12 +5,12 @@ import EmailSignup from "@/components/EmailSignup";
 export const metadata: Metadata = {
   title: "Commercial Real Estate Jobs & Career Resources | HireCRE",
   description:
-    "Browse commercial real estate jobs across acquisitions, asset management, development, lending, and proptech. HireCRE is a curated CRE job board and career resource hub built for serious operators.",
+    "Browse commercial real estate jobs across acquisitions, asset management, development, lending, and proptech. HireCRE is a curated CRE job board plus interview prep and underwriting resources.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Commercial Real Estate Jobs & Career Resources | HireCRE",
     description:
-      "A curated commercial real estate job board plus interview prep and career resources for CRE professionals.",
+      "A curated commercial real estate job board plus interview prep and underwriting resources for CRE professionals.",
     url: "https://hirecre.com",
     type: "website",
   },
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Commercial Real Estate Jobs & Career Resources | HireCRE",
     description:
-      "Curated CRE jobs + interview prep + career resources for commercial real estate professionals.",
+      "Curated CRE jobs + interview prep + underwriting resources for commercial real estate professionals.",
   },
 };
 
@@ -26,19 +26,19 @@ export default function HomePage() {
   const faqs = [
     {
       q: "What is HireCRE?",
-      a: "HireCRE is a curated commercial real estate job board and career resource hub. We organize CRE and proptech roles into a clean, searchable feed and publish interview prep and underwriting explainers built for institutional workflows.",
+      a: "HireCRE is a commercial real estate job board and career resource hub. We organize CRE and proptech roles into a clean, searchable feed and publish interview prep and underwriting explainers built for real-world CRE workflows.",
     },
     {
       q: "What types of commercial real estate jobs are on HireCRE?",
-      a: "Roles commonly include acquisitions, asset management, development, lending/credit, capital markets, brokerage, research, and proptech—across multiple markets and experience levels.",
+      a: "Roles commonly include acquisitions, asset management, development, lending/credit, capital markets, investment sales, research, property management, and proptech—across multiple markets and experience levels.",
     },
     {
       q: "Is HireCRE only for job listings?",
-      a: "No. In addition to the job feed, HireCRE includes interview prep and concept pages (e.g., DSCR, debt yield, cap rates, waterfalls) so candidates can learn how to explain the fundamentals clearly in interviews.",
+      a: "No. In addition to the job feed, HireCRE includes interview prep and concept pages (e.g., DSCR, debt yield, cap rates, waterfalls) so candidates can explain fundamentals clearly and interview at an institutional level.",
     },
     {
       q: "How do job alerts work?",
-      a: "You can sign up to receive job alerts and updates. Alerts are designed to surface relevant roles and resources without overwhelming your inbox.",
+      a: "You can sign up for alerts to receive relevant roles and new resources. Alerts are designed to be useful and targeted rather than noisy.",
     },
   ];
 
@@ -52,8 +52,42 @@ export default function HomePage() {
     })),
   };
 
+  // WebSite + SearchAction helps Google understand you have a searchable job inventory.
+  // Uses /board?q= search pattern. If your board uses a different query param, change it here.
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "HireCRE",
+    url: "https://hirecre.com",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: "https://hirecre.com/board?q={search_term_string}",
+      "query-input": "required name=search_term_string",
+    },
+  };
+
+  // Organization schema strengthens entity/brand signals.
+  // If you have a real logo URL, replace /favicon.png with your logo asset.
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "HireCRE",
+    url: "https://hirecre.com",
+    logo: "https://hirecre.com/favicon.png",
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+      />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -65,14 +99,13 @@ export default function HomePage() {
           {/* Hero */}
           <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
             <h1 className="text-4xl font-semibold tracking-tight text-gray-900">
-              Commercial real estate jobs — curated for serious operators
+              Commercial real estate jobs — plus interview prep and career resources
             </h1>
 
             <p className="mt-3 max-w-2xl text-lg text-gray-600">
-              HireCRE is a commercial real estate job board and career platform.
-              We curate roles across acquisitions, asset management, development,
-              lending, capital markets, and proptech — then organize them in a way
-              that actually helps you evaluate opportunities faster.
+              HireCRE combines a curated CRE job board with an interview prep and underwriting hub.
+              Find roles across acquisitions, asset management, development, lending, capital markets, and proptech —
+              and sharpen the concepts you need to explain in interviews.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -84,39 +117,39 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/login?signup=1"
-                className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-              >
-                Create account
-              </Link>
-
-              <Link
                 href="/interview-prep"
                 className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
               >
                 Interview prep
               </Link>
+
+              <Link
+                href="/login?signup=1"
+                className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                Create account
+              </Link>
             </div>
 
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               <div className="rounded-xl border border-gray-200 bg-white p-5">
-                <div className="text-sm font-semibold text-gray-900">Focused filters</div>
+                <div className="text-sm font-semibold text-gray-900">Clean discovery</div>
                 <div className="mt-1 text-sm text-gray-600">
-                  Company, market, role type, experience level, and remote-only.
+                  A readable feed designed for fast scanning and decision-making.
                 </div>
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-white p-5">
-                <div className="text-sm font-semibold text-gray-900">Built for CRE roles</div>
+                <div className="text-sm font-semibold text-gray-900">Built around CRE roles</div>
                 <div className="mt-1 text-sm text-gray-600">
-                  Acquisitions, asset management, development, lending, capital markets, brokerage, and proptech.
+                  Acquisitions, asset management, development, lending/credit, capital markets, and more.
                 </div>
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-white p-5">
-                <div className="text-sm font-semibold text-gray-900">Career resources</div>
+                <div className="text-sm font-semibold text-gray-900">Interview-ready resources</div>
                 <div className="mt-1 text-sm text-gray-600">
-                  Interview prep, underwriting concepts, and practical explainers.
+                  Concept explainers and interview framing written in institutional language.
                 </div>
               </div>
             </div>
@@ -127,40 +160,11 @@ export default function HomePage() {
             <EmailSignup source="home" />
           </div>
 
-          {/* Popular roles (light SEO coverage, not spammy) */}
+          {/* Popular resources (internal links = crawl depth + authority) */}
           <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">Popular CRE job categories</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Start with these interview prep essentials</h2>
             <p className="mt-2 text-sm leading-6 text-gray-600">
-              Common searches across HireCRE. Use these as starting points when you’re exploring the market.
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              {[
-                "Acquisitions",
-                "Asset Management",
-                "Development",
-                "Debt / Credit",
-                "Capital Markets",
-                "Investment Sales",
-                "Property Management",
-                "Research",
-                "PropTech",
-              ].map((label) => (
-                <span
-                  key={label}
-                  className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700"
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Popular resources (internal links) */}
-          <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900">Popular interview prep resources</h2>
-            <p className="mt-2 text-sm leading-6 text-gray-600">
-              Institutional explainers written for interviews — concise, precise, and built around real underwriting language.
+              The concepts that show up constantly in CRE debt and equity interviews.
             </p>
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -170,7 +174,7 @@ export default function HomePage() {
               >
                 <div className="text-sm font-semibold text-gray-900">DSCR vs Debt Yield (With Example)</div>
                 <div className="mt-1 text-sm text-gray-600">
-                  When each metric binds and how to explain it cleanly in interviews.
+                  When each metric binds, how rates change DSCR, and how to explain it cleanly.
                 </div>
               </Link>
 
@@ -190,7 +194,7 @@ export default function HomePage() {
               >
                 <div className="text-sm font-semibold text-gray-900">Cap Rate Explained (With Example)</div>
                 <div className="mt-1 text-sm text-gray-600">
-                  Value sensitivity, compression vs expansion, and interview framing.
+                  Value = NOI / cap rate, plus compression vs expansion interview framing.
                 </div>
               </Link>
             </div>
@@ -208,13 +212,13 @@ export default function HomePage() {
 
             <p className="mt-2 text-sm leading-6 text-gray-600">
               HireCRE is designed to be a centralized resource for commercial real estate careers — not just a feed of listings.
-              In addition to curated job opportunities, we publish interview preparation guides, underwriting breakdowns,
-              and concept explainers that help you think and speak like an institutional operator.
+              In addition to curated opportunities, we publish interview preparation guides, underwriting breakdowns,
+              and concept explainers that help candidates communicate like institutional practitioners.
             </p>
 
             <p className="mt-4 text-sm leading-6 text-gray-600">
-              Whether you’re targeting acquisitions roles, private equity, debt funds, mortgage REITs, development shops,
-              or brokerage platforms, HireCRE gives you both the opportunities and the context to compete.
+              If you’re targeting acquisitions, private equity, debt funds, mortgage REITs, development shops, or brokerage platforms,
+              HireCRE gives you both the opportunities and the context to compete.
             </p>
           </div>
 
@@ -225,9 +229,7 @@ export default function HomePage() {
             <div className="mt-4 space-y-3">
               {faqs.map((f) => (
                 <details key={f.q} className="rounded-xl border border-gray-200 bg-white p-5">
-                  <summary className="cursor-pointer text-sm font-semibold text-gray-900">
-                    {f.q}
-                  </summary>
+                  <summary className="cursor-pointer text-sm font-semibold text-gray-900">{f.q}</summary>
                   <p className="mt-2 text-sm leading-6 text-gray-600">{f.a}</p>
                 </details>
               ))}
