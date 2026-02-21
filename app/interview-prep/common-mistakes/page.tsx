@@ -42,7 +42,6 @@ const PREP_CARDS: PrepCard[] = [
     href: "/interview-prep/mini-case-practice",
   },
 
-  // ✅ new pages
   {
     title: "Loan Sizing Cheat Sheet",
     description:
