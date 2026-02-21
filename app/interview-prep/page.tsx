@@ -116,6 +116,12 @@ const EQUITY: PrepCard[] = [
     "What promote is, how GP incentives work, and a clean 70/30 after 8% pref walkthrough.",
   href: "/interview-prep/promote-structure",
 },
+  {
+  title: "Cap Rate Explained (With Example)",
+  description:
+    "Definition, formula, value sensitivity, and how to explain compression vs expansion in interviews.",
+  href: "/interview-prep/cap-rate-explained",
+},
 ];
 
 const AM: PrepCard[] = [
