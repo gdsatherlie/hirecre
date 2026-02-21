@@ -139,10 +139,10 @@ const RESEARCH: Resource[] = [
 
 const INTERVIEW: Resource[] = [
   {
-    title: "CRE Technical Interview Prep Guide",
+    title: "CRE Technical Interview Prep",
     description:
-      "Understand IRR, cap rates, waterfalls, and underwriting mechanics.",
-    href: "/board",
+      "Technical questions, underwriting concepts, key formulas, and modeling expectations.",
+    href: "/interview-prep",
   },
 ];
 
