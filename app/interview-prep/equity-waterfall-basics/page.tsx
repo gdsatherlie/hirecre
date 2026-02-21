@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, MiniMath, BottomCtas, Grid, RelatedLinks } from "../_components";
+import { PageShell, Section, Card, Callout, List, BottomCtas, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "Equity Waterfall Basics | HireCRE",
