@@ -31,22 +31,59 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 // ---- EXCLUSIONS: edit these any time (title-based) ----
+// Goal: remove facilities / building ops / low-signal roles (while keeping CRE + leasing + proptech)
 const EXCLUDE_TITLE_KEYWORDS = [
-  "janitor",
-  "cleaning",
-  "property maintenance",
+  // Building ops / facilities / maintenance
+  "facilities",
+  "facility",
   "maintenance",
   "maintenance technician",
-  "facilities",
-  "facilities manager",
-  "regional facilities",
-  "engineering",
-  "engineer",
-  "it",
-  "information technology",
+  "property maintenance",
+  "building engineer",
+  "engineer (facilities)",
+  "chief engineer",
+  "grounds",
+  "groundskeeper",
+  "porter",
+  "janitor",
+  "janitorial",
+  "housekeeper",
+  "housekeeping",
+  "custodian",
+  "cleaner",
+  "cleaning",
+  "landscaping",
+  "landscape",
+  "security guard",
+  "security officer",
+  "concierge",
+  "valet",
+  "housekeeper",
+  "landscape supervisor",
+  "landscaper",
+  "Porter",
+  "Design Manager",
+
+  // Food / hospitality (common noise on large operators)
+  "cook",
+  "server",
+  "bartender",
+
+  // Blue-collar / logistics
+  "warehouse",
+  "driver",
+  "delivery",
+  "service technician",
+
+  // Support IT (but NOT generic “engineering” — we want proptech roles to remain)
   "helpdesk",
   "desktop support",
-  "network",
+  "it support",
+  "network administrator",
+  "systems administrator",
+  "influencer marketing",
+
+  // Not your audience (agents)
   "licensed real estate agent",
   "real estate agent",
 ];
