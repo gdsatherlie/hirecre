@@ -21,6 +21,7 @@ const STATIC_PAGES: Entry[] = [
 
   // Debt & credit
   { path: "/interview-prep/bridge-lending-questions", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/interview-prep/dscr-vs-debt-yield", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/debt-yield-explained", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/underwriting-walkthrough", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/sponsor-risk-analysis", changeFrequency: "monthly", priority: 0.7 },
