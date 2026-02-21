@@ -24,6 +24,12 @@ const DEBT: PrepCard[] = [
   href: "/interview-prep/dscr-vs-debt-yield",
 },
   {
+  title: "Loan-to-Cost (LTC) (With Example)",
+  description:
+    "Cost-based leverage metric used in bridge and construction lending. Includes LTC vs LTV + purchase/reno example.",
+  href: "/interview-prep/loan-to-cost-ltc",
+},
+  {
     title: "Debt Yield Explained (With Example)",
     description:
       "How lenders use debt yield for sizing, which NOI to use, and how it ties to exit risk.",
