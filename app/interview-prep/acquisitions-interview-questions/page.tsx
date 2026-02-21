@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, BottomCtas, Grid } from "../_components";
+import { PageShell, Section, Card, Callout, List, BottomCtas, Grid, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "Acquisitions Interview Questions | HireCRE",
@@ -42,6 +42,14 @@ export default function AcquisitionsInterviewQuestions() {
         </Grid>
       </Section>
 
+      <RelatedLinks
+  items={[
+    { title: "Rent Roll + T-12 Deep Dive", href: "/interview-prep/rent-roll-t12-deep-dive" },
+    { title: "Asset Management Interview Questions", href: "/interview-prep/asset-management-interview-questions" },
+    { title: "REPE Interview Questions", href: "/interview-prep/repe-interview-questions" },
+  ]}
+/>
+      
       <BottomCtas />
     </PageShell>
   );
