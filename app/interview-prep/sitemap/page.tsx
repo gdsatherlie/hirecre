@@ -91,6 +91,12 @@ const EQUITY: LinkItem[] = [
     description: "Preferred return, catch-up, promote tiers — explained clearly.",
     href: "/interview-prep/equity-waterfall-basics",
   },
+  {
+  title: "Preferred Return (With 8% Example)",
+  description:
+    "What an 8% pref actually means, how it works in the waterfall, and how to explain it cleanly in interviews.",
+  href: "/interview-prep/preferred-return",
+},
 ];
 
 const AM: LinkItem[] = [
