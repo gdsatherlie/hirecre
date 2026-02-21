@@ -40,6 +40,7 @@ const STATIC_PAGES: Entry[] = [
   { path: "/interview-prep/preferred-return", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/promote-structure", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/cap-rate-explained", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/interview-prep/explain-irr-interview", changeFrequency: "monthly", priority: 0.7 },
 
   // Acquisitions / AM
   { path: "/interview-prep/acquisitions-interview-questions", changeFrequency: "monthly", priority: 0.7 },
