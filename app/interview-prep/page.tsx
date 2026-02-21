@@ -122,6 +122,12 @@ const EQUITY: PrepCard[] = [
     "Definition, formula, value sensitivity, and how to explain compression vs expansion in interviews.",
   href: "/interview-prep/cap-rate-explained",
 },
+  {
+  title: "How to Explain IRR in an Interview",
+  description:
+    "Plain-English IRR, timing intuition, IRR vs MOIC, and how to answer cleanly in interviews.",
+  href: "/interview-prep/explain-irr-interview",
+},
 ];
 
 const AM: PrepCard[] = [
