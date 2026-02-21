@@ -67,6 +67,13 @@ function PrepSection({ title, items }: { title: string; items: PrepCard[] }) {
   );
 }
 
+<a
+  href="/interview-prep/sitemap"
+  className="mt-3 inline-flex rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+>
+  View Interview Prep Sitemap
+</a>
+
 export default function InterviewPrepHubPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-12">
