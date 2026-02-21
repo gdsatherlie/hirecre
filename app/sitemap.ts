@@ -32,6 +32,7 @@ const STATIC_PAGES: Entry[] = [
   { path: "/interview-prep/broker-questions", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/credit-memo-template", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/common-mistakes", changeFrequency: "monthly", priority: 0.6 },
+  { path: "/interview-prep/dscr-minimums", changeFrequency: "monthly", priority: 0.7 },
 
   // Equity
   { path: "/interview-prep/repe-interview-questions", changeFrequency: "monthly", priority: 0.7 },
