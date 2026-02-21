@@ -30,12 +30,36 @@ const BOOKS: Resource[] = [
     badge: "Finance",
   },
   {
+    title: "Commercial Real Estate Analysis & Investments",
+    description:
+      "The technical CRE bible: valuation, leases, pro formas, risk, and institutional-grade analysis.",
+    href: "https://www.amazon.com/dp/0324305486?tag=hirecre-20",
+    cta: "View on Amazon",
+    badge: "Technical",
+  },
+  {
+    title: "Real Estate Market Analysis",
+    description:
+      "Market, submarket, and demand analysis—how to think about location, drivers, and absorption like a pro.",
+    href: "https://www.amazon.com/dp/0874204283?tag=hirecre-20",
+    cta: "View on Amazon",
+    badge: "Markets",
+  },
+  {
     title: "Best Ever Apartment Syndication Book",
     description:
       "Practical guide to multifamily syndication, deal structure, and raising capital—highly actionable.",
     href: "https://www.amazon.com/dp/0997454326?tag=hirecre-20",
     cta: "View on Amazon",
     badge: "Multifamily",
+  },
+  {
+    title: "Anatomy of Mortgage Loan Documents",
+    description:
+      "Key commercial loan docs explained: terms, negotiation points, and what actually matters in the paper.",
+    href: "https://www.amazon.com/dp/1639051120?tag=hirecre-20",
+    cta: "View on Amazon",
+    badge: "Loan Docs",
   },
 ];
 
