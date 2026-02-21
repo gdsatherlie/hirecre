@@ -104,6 +104,12 @@ const EQUITY: PrepCard[] = [
       "Preferred return, promote, catch-up — explained clearly without spreadsheet vomit.",
     href: "/interview-prep/equity-waterfall-basics",
   },
+  {
+  title: "Preferred Return (With 8% Example)",
+  description:
+    "What an 8% pref actually means, how it works in the waterfall, and how to explain it cleanly in interviews.",
+  href: "/interview-prep/preferred-return",
+},
 ];
 
 const AM: PrepCard[] = [
