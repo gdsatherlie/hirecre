@@ -1,79 +1,86 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import {
+  PageShell,
+  Section,
+  Card,
+  Callout,
+  List,
+  MiniMath,
+  BottomCtas,
+  Grid,
+} from "../_components";
 
 export const metadata: Metadata = {
   title: "Debt Yield Explained | HireCRE",
   description:
-    "Debt yield explained with examples: why lenders use it, how to size to it, and how it connects to exit risk and refinance viability.",
+    "Debt yield explained with examples: how lenders use it, which NOI to use, how to size to it, and how it connects to exit risk and refinance viability.",
 };
 
 export default function DebtYieldExplained() {
   return (
-    <main className="max-w-3xl mx-auto px-6 py-14">
-      <p className="text-sm text-gray-500 mb-6">
-        <Link href="/interview-prep" className="hover:underline">
-          Interview Prep
-        </Link>{" "}
-        <span className="mx-2">/</span>
-        <span>Debt Yield Explained</span>
-      </p>
+    <PageShell
+      crumb={{ label: "Interview Prep", href: "/interview-prep" }}
+      title="Debt Yield Explained"
+      description="Debt yield is a lender’s basis check. Interviews use it to test whether you can size to downside and connect the dots to refinance risk."
+    >
+      <Section title="Interview-ready explanation (20 seconds)">
+        <Callout title="Use this 5-step structure">
+          <List
+            items={[
+              <>
+                Define it: <b>NOI / Loan Amount</b>
+              </>,
+              <>State which NOI you’re using (in-place vs haircut-stabilized)</>,
+              <>Use it for sizing (minimum downside DY)</>,
+              <>Cross-check DSCR at stressed rates</>,
+              <>Confirm exit with stressed cap + realistic takeout rate</>,
+            ]}
+          />
+        </Callout>
+      </Section>
 
-      <h1 className="text-4xl font-semibold tracking-tight mb-4">
-        Debt Yield Explained (The Way Lenders Actually Use It)
-      </h1>
-
-      <p className="text-lg text-gray-600 mb-10">
-        Debt yield is one of the fastest ways to communicate lender basis and downside
-        protection — especially in bridge lending. Interviews use it as a shortcut to
-        test whether you think like a lender (not a spreadsheet).
-      </p>
-
-      <QuickFramework />
-
-      <Section title="1) Definition: what debt yield is (and isn’t)">
-        <WhatTheyTest>
-          Whether you can define debt yield in one sentence and explain why it matters,
-          without confusing it with DSCR or LTV.
-        </WhatTheyTest>
+      <Section title="1) Definition: what it is (and isn’t)">
+        <Card
+          title="What they’re testing"
+          description="That you can define debt yield in one sentence and explain why it matters without mixing it up with DSCR or LTV."
+        />
 
         <Callout title="Clean definition">
-          <p className="text-gray-800">
-            <b>Debt yield</b> = <b>NOI / Loan Amount</b>. It’s a lender’s “income-on-basis”
-            check: if the plan stalls, what income does the collateral generate relative
-            to our loan basis?
-          </p>
+          <>
+            <b>Debt yield</b> = <b>NOI / Loan Amount</b>. It’s an “income on basis”
+            check: if the business plan stalls, what income does the asset generate
+            relative to the lender’s basis?
+          </>
         </Callout>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Grid>
           <Card title="What it captures">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>Basis / asset income relative to loan</li>
-              <li>Downside protection if NOI disappoints</li>
-              <li>Less sensitive to rate changes than DSCR</li>
-            </ul>
+            <List
+              items={[
+                <>Downside protection and lender basis</>,
+                <>Less sensitive to rate swings than DSCR</>,
+                <>A quick asset-quality check in bridge lending</>,
+              ]}
+            />
           </Card>
 
           <Card title="What it doesn’t capture">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>Actual cash flow coverage of debt service</li>
-              <li>Capex / leasing timing risk by itself</li>
-              <li>Exit proceeds (you still need exit underwriting)</li>
-            </ul>
+            <List
+              items={[
+                <>Actual debt service coverage (that’s DSCR)</>,
+                <>Capex/leasing timing risk by itself</>,
+                <>Exit proceeds (you still need exit underwriting)</>,
+              ]}
+            />
           </Card>
-        </div>
+        </Grid>
       </Section>
 
-      <Section title="2) How lenders use it in sizing">
-        <WhatTheyTest>
-          Whether you can describe debt yield as a sizing constraint and choose a conservative NOI
-          (in-place or haircut-stabilized), then cross-check DSCR and exit.
-        </WhatTheyTest>
-
-        <Callout title="Sizing logic (say this in interviews)">
-          “I size to a minimum debt yield on a conservative NOI — often in-place or haircut-stabilized —
-          then cross-check DSCR at stressed rates and confirm the takeout works at a realistic exit cap
-          and refinance rate.”
-        </Callout>
+      <Section title="2) How lenders actually use it for sizing">
+        <Card
+          title="What they’re testing"
+          description="That you pick a conservative NOI (in-place or haircut-stabilized), size to a minimum DY, then cross-check DSCR and exit."
+        />
 
         <MiniMath
           label="Sizing example"
@@ -82,183 +89,70 @@ export default function DebtYieldExplained() {
             ["Target debt yield", "8.0%"],
             ["Max loan (NOI / DY)", "$30.0mm"],
           ]}
-          note="Then add: ‘I’ll cross-check DSCR at stressed SOFR/spread and verify exit proceeds clear.’"
+          note="Then say: ‘I’ll cross-check DSCR at stressed rates and confirm takeout clears at a realistic cap/rate.’"
         />
-      </Section>
 
-      <Section title="3) Debt yield vs DSCR (when each matters)">
-        <WhatTheyTest>
-          Whether you understand why DSCR can look “fine” because of reserves/rate caps or temporary interest
-          reserves, while debt yield still tells you your basis is tight.
-        </WhatTheyTest>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card title="Debt yield is strongest when…">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>Transitional cash flow is volatile</li>
-              <li>Debt service is temporarily managed (reserves)</li>
-              <li>Rates are moving and DSCR swings</li>
-            </ul>
-          </Card>
-          <Card title="DSCR is strongest when…">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>Cash flow is stable and recurring</li>
-              <li>You’re underwriting permanent takeout</li>
-              <li>Amortization / fixed rates matter</li>
-            </ul>
-          </Card>
-        </div>
-
-        <Callout title="A senior-sounding line">
-          “Debt yield tells me the basis. DSCR tells me survivability. In bridge, I want both —
-          but I size to the one that protects me if execution is delayed.”
+        <Callout title="Senior-sounding line">
+          <>
+            “Debt yield tells me the basis. DSCR tells me survivability. In bridge,
+            I want both — but I size to the metric that protects me if execution is delayed.”
+          </>
         </Callout>
       </Section>
 
-      <Section title="4) The interview trap: mixing NOI definitions">
-        <WhatTheyTest>
-          Whether you’re disciplined about which NOI you’re using (in-place, underwritten, stabilized).
-          Strong candidates explicitly state it.
-        </WhatTheyTest>
+      <Section title="3) The NOI definition trap (in-place vs stabilized)">
+        <Card
+          title="What they’re testing"
+          description="That you’re disciplined about the NOI definition. Strong candidates explicitly quote both downside and business plan versions."
+        />
 
         <Callout title="Say this out loud">
-          “My debt yield depends on the NOI definition. I’ll quote both: in-place DY for downside and
-          stabilized DY for the business plan — and I’ll make sure the loan is still ‘money-good’ on
-          the downside case.”
+          <>
+            “Debt yield depends on the NOI definition. I’ll quote <b>in-place DY</b> for
+            downside and <b>stabilized DY</b> for the business plan — and make sure the
+            loan is still ‘money-good’ on the downside case.”
+          </>
         </Callout>
 
-        <ul className="list-disc pl-6 space-y-2 text-gray-700">
-          <li><b>In-place NOI:</b> downside / today’s reality</li>
-          <li><b>Underwritten NOI:</b> haircut of assumptions</li>
-          <li><b>Stabilized NOI:</b> business plan outcome</li>
-        </ul>
+        <Grid>
+          <Card title="In-place NOI">
+            <List items={[<>Today’s reality; best for downside sizing</>]} />
+          </Card>
+          <Card title="Haircut-stabilized NOI">
+            <List items={[<>Underwritten; conservative view of stabilization</>]} />
+          </Card>
+          <Card title="Stabilized NOI">
+            <List items={[<>Business plan outcome; not the basis for downside</>]} />
+          </Card>
+        </Grid>
       </Section>
 
-      <Section title="5) How it ties to exit risk (the real point)">
-        <WhatTheyTest>
-          Whether you connect the dots: if debt yield is thin, you’re relying on a perfect exit environment.
-        </WhatTheyTest>
+      <Section title="4) How debt yield connects to exit risk (the real point)">
+        <Card
+          title="What they’re testing"
+          description="That you connect thin debt yield to reliance on a perfect exit environment — and you underwrite takeout at stressed assumptions."
+        />
 
-        <Callout title="Exit connection (simple and powerful)">
-          “A thin debt yield means I’m tight on basis. If cap rates widen or NOI misses, exit proceeds compress —
-          which is why I underwrite the takeout at a stressed cap and rate.”
+        <Callout title="Simple connection (powerful in interviews)">
+          <>
+            “A thin debt yield means I’m tight on basis. If NOI misses or cap rates widen,
+            exit proceeds compress — which is why I underwrite takeout at a <b>stressed cap</b>
+            and a <b>realistic takeout rate</b>.”
+          </>
         </Callout>
 
         <MiniMath
-          label="Quick exit reality check (conceptual)"
+          label="Quick exit sanity check"
           rows={[
             ["Stabilized NOI", "$3.2mm"],
             ["Exit cap (stressed)", "6.50%"],
             ["Implied value", "~$49.2mm"],
           ]}
-          note="Then compare value vs loan + costs and explain refinance margin."
+          note="Then compare value vs loan basis + costs to describe refinance margin."
         />
       </Section>
 
-      <BottomNav />
-    </main>
-  );
-}
-
-/* ---------- shared UI helpers ---------- */
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-12">
-      <h2 className="text-2xl font-semibold mb-4">{title}</h2>
-      <div className="space-y-6">{children}</div>
-    </section>
-  );
-}
-
-function WhatTheyTest({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border bg-white p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-2">What they’re testing</p>
-      <p className="text-gray-700">{children}</p>
-    </div>
-  );
-}
-
-function Callout({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border bg-gray-50 p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-2">{title}</p>
-      <div className="text-gray-800">{children}</div>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border bg-white p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-3">{title}</p>
-      {children}
-    </div>
-  );
-}
-
-function MiniMath({
-  label,
-  rows,
-  note,
-}: {
-  label: string;
-  rows: [string, string][];
-  note?: string;
-}) {
-  return (
-    <div className="rounded-2xl border bg-white p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-3">{label}</p>
-      <div className="space-y-2">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between gap-4">
-            <span className="text-gray-700">{k}</span>
-            <span className="font-semibold text-gray-900">{v}</span>
-          </div>
-        ))}
-      </div>
-      {note ? <p className="mt-3 text-sm text-gray-600">{note}</p> : null}
-    </div>
-  );
-}
-
-function QuickFramework() {
-  return (
-    <div className="rounded-2xl border bg-gray-50 p-6">
-      <h2 className="text-xl font-semibold mb-2">Interview-ready explanation (20 seconds)</h2>
-      <ol className="list-decimal pl-6 space-y-2 text-gray-800">
-        <li>Define it (NOI / Loan)</li>
-        <li>State which NOI you’re using (in-place vs stabilized)</li>
-        <li>Use it for sizing (minimum DY)</li>
-        <li>Cross-check DSCR</li>
-        <li>Confirm exit with stressed cap/rate</li>
-      </ol>
-    </div>
-  );
-}
-
-function BottomNav() {
-  return (
-    <div className="mt-14 flex flex-wrap gap-3">
-      <Link
-        href="/interview-prep"
-        className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 transition"
-      >
-        Back to Hub
-      </Link>
-      <Link
-        href="/board"
-        className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 transition"
-      >
-        Browse Jobs
-      </Link>
-      <Link
-        href="/alerts"
-        className="rounded-lg bg-black text-white px-4 py-2 text-sm hover:opacity-90 transition"
-      >
-        Get Weekly Alerts
-      </Link>
-    </div>
+      <BottomCtas />
+    </PageShell>
   );
 }
