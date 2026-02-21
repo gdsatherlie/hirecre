@@ -17,6 +17,11 @@ const DEBT: LinkItem[] = [
     href: "/interview-prep/bridge-lending-questions",
   },
   {
+  title: "DSCR vs Debt Yield (With Example)",
+  description: "Clear explanation + interview-ready example you can repeat.",
+  href: "/interview-prep/dscr-vs-debt-yield",
+},
+  {
     title: "Debt Yield Explained (With Example)",
     description: "How lenders use debt yield for sizing, which NOI to use, and how it ties to exit risk.",
     href: "/interview-prep/debt-yield-explained",
