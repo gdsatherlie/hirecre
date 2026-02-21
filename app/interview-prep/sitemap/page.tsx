@@ -96,6 +96,11 @@ const EQUITY: LinkItem[] = [
   description: "What an 8% pref actually means, how it works in the waterfall, and how to explain it in interviews.",
   href: "/interview-prep/preferred-return",
 },
+  {
+  title: "Promote Structure (With 70/30 Example)",
+  description: "What promote is, how GP incentives work, and a clean 70/30 after 8% pref walkthrough.",
+  href: "/interview-prep/promote-structure",
+},
 ];
 
 const AM: LinkItem[] = [
