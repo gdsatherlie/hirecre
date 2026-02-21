@@ -37,6 +37,7 @@ const STATIC_PAGES: Entry[] = [
   { path: "/interview-prep/repe-interview-questions", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/equity-returns-101", changeFrequency: "monthly", priority: 0.7 },
   { path: "/interview-prep/equity-waterfall-basics", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/interview-prep/preferred-return", changeFrequency: "monthly", priority: 0.7 },
 
   // Acquisitions / AM
   { path: "/interview-prep/acquisitions-interview-questions", changeFrequency: "monthly", priority: 0.7 },
