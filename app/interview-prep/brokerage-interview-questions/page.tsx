@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, BottomCtas, Grid } from "../_components";
+import { PageShell, Section, Card, Callout, List, BottomCtas, Grid, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "Brokerage Interview Questions | HireCRE",
@@ -36,7 +36,13 @@ export default function BrokerageInterviewQuestions() {
           </>
         </Callout>
       </Section>
-
+<RelatedLinks
+  items={[
+    { title: "Leasing Interview Questions", href: "/interview-prep/leasing-interview-questions" },
+    { title: "Property Management Interview Questions", href: "/interview-prep/property-management-interview-questions" },
+    { title: "Debt Origination Questions (Broker Call)", href: "/interview-prep/broker-questions" },
+  ]}
+/>
       <BottomCtas />
     </PageShell>
   );
