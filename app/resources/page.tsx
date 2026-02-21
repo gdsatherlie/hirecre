@@ -117,7 +117,7 @@ export default function ResourcesPage() {
           <Card
             title="The Real Estate Game"
             body="A behind-the-scenes look at how major real estate deals actually get done."
-            href="YOUR_AMAZON_LINK_1"
+            href=https://www.amazon.com/dp/068485550X?tag=hirecre-20
             cta="View"
           />
           <Card
