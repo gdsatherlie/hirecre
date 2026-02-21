@@ -73,6 +73,11 @@ const DEBT: LinkItem[] = [
     description: "Interview traps: NOI definitions, exit caps, timing risk, generic structure.",
     href: "/interview-prep/common-mistakes",
   },
+  {
+  title: "DSCR Minimums (What Lenders Look For)",
+  description: "Why DSCR minimums vary, rate sensitivity, stressed DSCR, and interview-ready lender framing.",
+  href: "/interview-prep/dscr-minimums",
+},
 ];
 
 const EQUITY: LinkItem[] = [
