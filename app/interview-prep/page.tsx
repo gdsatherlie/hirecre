@@ -41,6 +41,45 @@ const PREP_CARDS: PrepCard[] = [
       "A mock deal + a 60–90 second model answer that sounds senior and credit-focused.",
     href: "/interview-prep/mini-case-practice",
   },
+  const PREP_CARDS: PrepCard[] = [
+  // existing 5...
+
+  {
+    title: "Loan Sizing Cheat Sheet",
+    description:
+      "A one-page way to size to debt yield, DSCR, and LTV — and explain which constraint binds.",
+    href: "/interview-prep/loan-sizing-cheat-sheet",
+  },
+  {
+    title: "Exit Underwriting (Refi + Sale)",
+    description:
+      "How to underwrite the takeout: stressed cap rates, takeout DSCR, and refinance proceeds.",
+    href: "/interview-prep/exit-underwriting",
+  },
+  {
+    title: "Risk & Structure Playbook",
+    description:
+      "Match the risk to the protection: reserves, cash management, milestones, covenants, guarantees.",
+    href: "/interview-prep/risk-and-structure",
+  },
+  {
+    title: "Debt Origination Questions (Broker Call)",
+    description:
+      "The exact questions to ask a broker: business plan, economics, sponsor, diligence, and timing.",
+    href: "/interview-prep/broker-questions",
+  },
+  {
+    title: "Credit Memo Template (1 Page)",
+    description:
+      "A simple lender-style writeup format you can use in interviews or take-home cases.",
+    href: "/interview-prep/credit-memo-template",
+  },
+  {
+    title: "Common Mistakes (and How to Avoid Them)",
+    description:
+      "The interview traps: mixing NOI definitions, sloppy exit caps, ignoring timing risk, and more.",
+    href: "/interview-prep/common-mistakes",
+  },
 ];
 
 function PrepSection({ title, items }: { title: string; items: PrepCard[] }) {
