@@ -172,3 +172,32 @@ export function BottomCtas() {
     </div>
   );
 }
+export function RelatedLinks({
+  title = "Related",
+  items,
+}: {
+  title?: string;
+  items: { title: string; href: string; description?: string }[];
+}) {
+  if (!items?.length) return null;
+
+  return (
+    <section className="mt-12">
+      <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+      <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div className="font-semibold text-slate-900">{item.title}</div>
+            {item.description ? (
+              <div className="mt-2 text-sm text-slate-600">{item.description}</div>
+            ) : null}
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
