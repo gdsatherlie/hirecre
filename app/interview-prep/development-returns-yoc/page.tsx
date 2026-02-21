@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, MiniMath, BottomCtas } from "../_components";
+import { PageShell, Section, Card, Callout, List, MiniMath, BottomCtas, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "Development Returns (Yield-on-Cost) | HireCRE",
@@ -47,6 +47,13 @@ export default function DevelopmentReturnsYoc() {
         </Callout>
       </Section>
 
+      <RelatedLinks
+  items={[
+    { title: "Development Interview Questions", href: "/interview-prep/development-interview-questions" },
+    { title: "Construction Budget 101", href: "/interview-prep/construction-budget-101" },
+    { title: "Equity Returns 101 (IRR vs MOIC)", href: "/interview-prep/equity-returns-101" },
+  ]}
+/>
       <BottomCtas />
     </PageShell>
   );
