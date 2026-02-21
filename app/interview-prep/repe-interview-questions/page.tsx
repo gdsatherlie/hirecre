@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, BottomCtas, Grid } from "../_components";
+import { PageShell, Section, Card, Callout, List, BottomCtas, Grid, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "REPE Interview Questions | HireCRE",
@@ -50,7 +50,14 @@ export default function RepeInterviewQuestions() {
           </>
         </Callout>
       </Section>
-
+<RelatedLinks
+  items={[
+    { title: "Equity Returns 101 (IRR vs MOIC)", href: "/interview-prep/equity-returns-101" },
+    { title: "Equity Waterfall Basics", href: "/interview-prep/equity-waterfall-basics" },
+    { title: "Acquisitions Interview Questions", href: "/interview-prep/acquisitions-interview-questions" },
+  ]}
+/>
+      
       <BottomCtas />
     </PageShell>
   );
