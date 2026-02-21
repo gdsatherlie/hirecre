@@ -18,6 +18,12 @@ const DEBT: PrepCard[] = [
     href: "/interview-prep/bridge-lending-questions",
   },
   {
+  title: "DSCR vs Debt Yield (With Example)",
+  description:
+    "When each metric binds, how rates change DSCR, and how to explain it cleanly in interviews.",
+  href: "/interview-prep/dscr-vs-debt-yield",
+},
+  {
     title: "Debt Yield Explained (With Example)",
     description:
       "How lenders use debt yield for sizing, which NOI to use, and how it ties to exit risk.",
