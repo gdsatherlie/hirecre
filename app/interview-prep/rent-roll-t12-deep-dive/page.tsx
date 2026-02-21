@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageShell, Section, Card, Callout, List, BottomCtas, Grid } from "../_components";
+import { PageShell, Section, Card, Callout, List, BottomCtas, Grid, RelatedLinks } from "../_components";
 
 export const metadata: Metadata = {
   title: "Rent Roll + T-12 Deep Dive | HireCRE",
@@ -41,6 +41,14 @@ export default function RentRollT12DeepDive() {
         </Callout>
       </Section>
 
+      <RelatedLinks
+  items={[
+    { title: "Acquisitions Interview Questions", href: "/interview-prep/acquisitions-interview-questions" },
+    { title: "Asset Management Interview Questions", href: "/interview-prep/asset-management-interview-questions" },
+    { title: "Walk Me Through Your Underwriting", href: "/interview-prep/underwriting-walkthrough" },
+  ]}
+/>
+      
       <BottomCtas />
     </PageShell>
   );
