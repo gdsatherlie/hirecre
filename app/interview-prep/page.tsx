@@ -1,7 +1,7 @@
 export const metadata = {
   title: "Interview Prep | HireCRE",
   description:
-    "Lender-grade commercial real estate interview prep: bridge lending, debt yield, underwriting walkthroughs, sponsor risk, and mini-case practice.",
+    "Commercial real estate interview prep across debt, equity, acquisitions, asset management, development, leasing, brokerage, and property operations.",
 };
 
 type PrepCard = {
@@ -10,74 +10,41 @@ type PrepCard = {
   href: string;
 };
 
-const PREP_CARDS: PrepCard[] = [
-  {
-    title: "Bridge Lending Interview Questions",
-    description:
-      "Real prompts + what they’re testing: sizing, exit risk, sponsor evaluation, and structure.",
-    href: "/interview-prep/bridge-lending-questions",
-  },
-  {
-    title: "Debt Yield Explained (With Example)",
-    description:
-      "How lenders actually use debt yield for sizing, what NOI to use, and how it ties to exit risk.",
-    href: "/interview-prep/debt-yield-explained",
-  },
-  {
-    title: "Walk Me Through Your Underwriting",
-    description:
-      "A lender-grade script: deal story → NOI build → sizing → exit → risks → structure.",
-    href: "/interview-prep/underwriting-walkthrough",
-  },
-  {
-    title: "Evaluating Sponsor Risk",
-    description:
-      "A practical scorecard: liquidity vs exposure, track record, ops bench, concentration, and red flags.",
-    href: "/interview-prep/sponsor-risk-analysis",
-  },
-  {
-    title: "CRE Mini Case Practice",
-    description:
-      "A mock deal + a 60–90 second model answer that sounds senior and credit-focused.",
-    href: "/interview-prep/mini-case-practice",
-  },
+const DEBT: PrepCard[] = [
+  { title: "Bridge Lending Interview Questions", description: "Real prompts + what they’re testing: sizing, exit risk, sponsor evaluation, and structure.", href: "/interview-prep/bridge-lending-questions" },
+  { title: "Debt Yield Explained (With Example)", description: "How lenders use debt yield for sizing, which NOI to use, and how it ties to exit risk.", href: "/interview-prep/debt-yield-explained" },
+  { title: "Walk Me Through Your Underwriting", description: "A lender-grade script: deal story → NOI build → sizing → exit → risks → structure.", href: "/interview-prep/underwriting-walkthrough" },
+  { title: "Evaluating Sponsor Risk", description: "A practical scorecard: liquidity vs exposure, track record, ops bench, concentration, red flags.", href: "/interview-prep/sponsor-risk-analysis" },
+  { title: "Exit Underwriting (Refi + Sale)", description: "How to underwrite the takeout: stressed cap rates, takeout DSCR, and refinance proceeds.", href: "/interview-prep/exit-underwriting" },
+  { title: "Risk & Structure Playbook", description: "Match the risk to the protection: reserves, cash management, milestones, covenants, guarantees.", href: "/interview-prep/risk-and-structure" },
+  { title: "Loan Sizing Cheat Sheet", description: "Size to debt yield, DSCR, and LTV — and explain which constraint binds.", href: "/interview-prep/loan-sizing-cheat-sheet" },
+  { title: "Debt Origination Questions (Broker Call)", description: "The exact questions to ask: business plan, economics, sponsor, diligence, timing.", href: "/interview-prep/broker-questions" },
+  { title: "Credit Memo Template (1 Page)", description: "A clean lender-style writeup you can use in interviews or take-home cases.", href: "/interview-prep/credit-memo-template" },
+  { title: "Common Mistakes (and How to Avoid Them)", description: "Interview traps: NOI definitions, exit caps, timing risk, generic structure.", href: "/interview-prep/common-mistakes" },
+];
 
-  {
-    title: "Loan Sizing Cheat Sheet",
-    description:
-      "A one-page way to size to debt yield, DSCR, and LTV — and explain which constraint binds.",
-    href: "/interview-prep/loan-sizing-cheat-sheet",
-  },
-  {
-    title: "Exit Underwriting (Refi + Sale)",
-    description:
-      "How to underwrite the takeout: stressed cap rates, takeout DSCR, and refinance proceeds.",
-    href: "/interview-prep/exit-underwriting",
-  },
-  {
-    title: "Risk & Structure Playbook",
-    description:
-      "Match the risk to the protection: reserves, cash management, milestones, covenants, guarantees.",
-    href: "/interview-prep/risk-and-structure",
-  },
-  {
-    title: "Debt Origination Questions (Broker Call)",
-    description:
-      "The exact questions to ask a broker: business plan, economics, sponsor, diligence, and timing.",
-    href: "/interview-prep/broker-questions",
-  },
-  {
-    title: "Credit Memo Template (1 Page)",
-    description:
-      "A simple lender-style writeup format you can use in interviews or take-home cases.",
-    href: "/interview-prep/credit-memo-template",
-  },
-  {
-    title: "Common Mistakes (and How to Avoid Them)",
-    description:
-      "The interview traps: mixing NOI definitions, sloppy exit caps, ignoring timing risk, and more.",
-    href: "/interview-prep/common-mistakes",
-  },
+const EQUITY: PrepCard[] = [
+  { title: "REPE Interview Questions", description: "Real estate private equity prompts: deal judgment, returns, IC thinking, and risk framing.", href: "/interview-prep/repe-interview-questions" },
+  { title: "Equity Returns 101 (IRR vs MOIC)", description: "How to explain IRR, MOIC, cash-on-cash, and what they mean in practice.", href: "/interview-prep/equity-returns-101" },
+  { title: "Equity Waterfall Basics", description: "Preferred return, promote, catch-up — explained clearly without spreadsheet vomit.", href: "/interview-prep/equity-waterfall-basics" },
+];
+
+const AM: PrepCard[] = [
+  { title: "Acquisitions Interview Questions", description: "How acquisitions teams think: story, underwriting, downside, comps, and conviction.", href: "/interview-prep/acquisitions-interview-questions" },
+  { title: "Asset Management Interview Questions", description: "NOI bridges, leasing plans, KPIs, and how you actually manage value-add execution.", href: "/interview-prep/asset-management-interview-questions" },
+  { title: "Rent Roll + T-12 Deep Dive", description: "What to look for fast: concessions, rollover risk, bad debt, expenses, and normalization.", href: "/interview-prep/rent-roll-t12-deep-dive" },
+];
+
+const DEV: PrepCard[] = [
+  { title: "Development Interview Questions", description: "Entitlements, budgets, timelines, feasibility, and how developers talk returns.", href: "/interview-prep/development-interview-questions" },
+  { title: "Construction Budget 101", description: "Hard vs soft costs, contingency, GMP, and the stuff that actually blows up deals.", href: "/interview-prep/construction-budget-101" },
+  { title: "Development Returns (Yield-on-Cost)", description: "Yield-on-cost, spread to market cap, margin, and when a project is actually financeable.", href: "/interview-prep/development-returns-yoc" },
+];
+
+const LEASING_OPS: PrepCard[] = [
+  { title: "Leasing Interview Questions", description: "Office/retail/industrial leasing prompts: pipeline, comps, concessions, and tenant strategy.", href: "/interview-prep/leasing-interview-questions" },
+  { title: "Brokerage Interview Questions", description: "How to answer around sourcing, relationships, market knowledge, and deal execution.", href: "/interview-prep/brokerage-interview-questions" },
+  { title: "Property Management Interview Questions", description: "Operations + NOI drivers: delinquencies, expenses, service levels, and reporting.", href: "/interview-prep/property-management-interview-questions" },
 ];
 
 function PrepSection({ title, items }: { title: string; items: PrepCard[] }) {
@@ -108,13 +75,17 @@ export default function InterviewPrepHubPage() {
           CRE Interview Prep
         </h1>
         <p className="mt-3 max-w-2xl text-base text-slate-600">
-          Lender-grade interview prep for commercial real estate roles — focused on
-          bridge lending, underwriting judgment, sponsor risk, and how to talk through
-          deals clearly under pressure.
+          Interview prep across the entire commercial real estate industry — debt,
+          equity, acquisitions, asset management, development, leasing, brokerage,
+          and property operations.
         </p>
       </header>
 
-      <PrepSection title="🧠 Interview Prep Hub" items={PREP_CARDS} />
+      <PrepSection title="🏦 Debt & Credit" items={DEBT} />
+      <PrepSection title="📈 Equity & Investments" items={EQUITY} />
+      <PrepSection title="🏢 Acquisitions & Asset Management" items={AM} />
+      <PrepSection title="🏗️ Development & Construction" items={DEV} />
+      <PrepSection title="🤝 Leasing, Brokerage & Property Ops" items={LEASING_OPS} />
 
       <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="font-semibold text-slate-900">Want weekly CRE roles + prep?</div>
@@ -127,11 +98,6 @@ export default function InterviewPrepHubPage() {
         >
           Subscribe to Alerts
         </a>
-      </div>
-
-      <div className="mt-12 text-xs text-slate-500">
-        Note: This content is educational and general in nature. Always tailor your
-        answers to the role, asset type, and the firm’s strategy.
       </div>
     </main>
   );
