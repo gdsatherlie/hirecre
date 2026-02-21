@@ -1,253 +1,180 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import {
+  PageShell,
+  Section,
+  Card,
+  Callout,
+  List,
+  MiniMath,
+  BottomCtas,
+  Grid,
+} from "../_components";
 
 export const metadata: Metadata = {
-  title: "Walk Me Through Your Underwriting | HireCRE",
+  title: "Sponsor Risk Analysis | HireCRE",
   description:
-    "A lender-grade underwriting walkthrough: the exact structure to answer interviews with clarity—NOI build, sizing, exit, risks, and structure.",
+    "How lenders evaluate sponsor risk: liquidity, net worth, track record, operational capability, concentration, and red flags—and how it changes structure.",
 };
 
-export default function UnderwritingWalkthrough() {
+export default function SponsorRiskAnalysis() {
   return (
-    <main className="max-w-3xl mx-auto px-6 py-14">
-      <p className="text-sm text-gray-500 mb-6">
-        <Link href="/interview-prep" className="hover:underline">
-          Interview Prep
-        </Link>{" "}
-        <span className="mx-2">/</span>
-        <span>Underwriting Walkthrough</span>
-      </p>
-
-      <h1 className="text-4xl font-semibold tracking-tight mb-4">
-        “Walk Me Through Your Underwriting” (A Script That Sounds Senior)
-      </h1>
-
-      <p className="text-lg text-gray-600 mb-10">
-        This question is testing structure, judgment, and priorities. The goal is
-        to tell a clean story, size to downside, confirm the exit, then explain the
-        risks you’d protect with structure.
-      </p>
-
-      <QuickFramework />
-
-      <Section title="1) Start with the deal story (10 seconds)">
-        <WhatTheyTest>
-          Whether you can summarize the deal in plain English and identify the business plan.
-        </WhatTheyTest>
-
-        <Callout title="Say it like this">
-          “It’s a transitional [asset] in [market]. The business plan is [lease-up/renovation/re-tenanting]
-          over ~[X] months, targeting NOI from ~$[A] to ~$[B]. My underwriting focuses on downside stability,
-          execution timing, and refinance viability.”
+    <PageShell
+      crumb={{ label: "Interview Prep", href: "/interview-prep" }}
+      title="Evaluating Sponsor Risk"
+      description="Sponsor risk is not ‘big net worth = good.’ It’s repeatability, liquidity, operational execution, and behavior under stress."
+    >
+      <Section title="How to answer sponsor questions (15 seconds)">
+        <Callout title="The sponsor lens">
+          <List
+            items={[
+              <>Same-deal track record (same asset + same business plan)</>,
+              <>Liquidity vs exposure (carry + capex + cushion)</>,
+              <>Ops bench (PM/leasing/construction capability)</>,
+              <>Concentration + maturity schedule</>,
+              <>Red flags → structure or lower proceeds</>,
+            ]}
+          />
         </Callout>
       </Section>
 
-      <Section title="2) Build NOI the right way (and state assumptions)">
-        <WhatTheyTest>
-          Whether you’re disciplined about drivers: occupancy, rent, concessions, expenses, and timing.
-        </WhatTheyTest>
+      <Section title="1) The sponsor scorecard">
+        <Card
+          title="What they’re testing"
+          description="That you prioritize the right categories and describe what ‘good’ looks like: execution ability + supportability."
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card title="Revenue (what you mention)">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>In-place rent roll & occupancy</li>
-              <li>Market rent comps (with a haircut)</li>
-              <li>Lease-up velocity / downtime assumptions</li>
-              <li>Other income (be conservative)</li>
-            </ul>
+        <Grid>
+          <Card title="Ability to execute">
+            <List
+              items={[
+                <>Same asset class + similar business plan experience</>,
+                <>Local market presence and vendor/PM bench</>,
+                <>Evidence of execution under stress</>,
+              ]}
+            />
           </Card>
-          <Card title="Expenses (what you mention)">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>Taxes (reassessment risk)</li>
-              <li>Insurance trend</li>
-              <li>Payroll/repairs/utilities sensitivity</li>
-              <li>Mgmt fee and reserves</li>
-            </ul>
-          </Card>
-        </div>
 
-        <Callout title="The line that separates pros from amateurs">
-          “I underwrite to a conservative stabilized NOI, then I run a downside case where lease-up is
-          delayed and rents are lower, because timing risk is usually what kills bridge deals.”
+          <Card title="Ability to support the deal">
+            <List
+              items={[
+                <>Liquidity relative to carry + capex</>,
+                <>Net worth relative to guarantees (where applicable)</>,
+                <>Real equity at risk (not “thin”)</>,
+              ]}
+            />
+          </Card>
+        </Grid>
+
+        <Callout title="Senior framing">
+          <>
+            “I separate ability to execute from ability to support the deal. Both matter —
+            but liquidity is usually the shock absorber in bridge when timing slips.”
+          </>
         </Callout>
       </Section>
 
-      <Section title="3) Size the loan (downside first)">
-        <WhatTheyTest>
-          Whether you size to a binding constraint and can explain why (debt yield, DSCR, LTV).
-        </WhatTheyTest>
+      <Section title="2) Liquidity: the real shock absorber">
+        <Card
+          title="What they’re testing"
+          description="That you treat liquidity as what prevents a maturity issue from becoming a loss—especially in transitional deals."
+        />
 
-        <Callout title="A clean sizing sequence">
-          <ol className="list-decimal pl-6 space-y-2">
-            <li>Size to minimum <b>downside debt yield</b> on conservative NOI</li>
-            <li>Cross-check <b>DSCR</b> at stressed rates / cap cost</li>
-            <li>Confirm <b>LTV</b> vs as-is and stabilized value (haircut)</li>
-          </ol>
+        <Callout title="How to talk about liquidity">
+          <>
+            “I compare liquidity to the deal’s likely cash needs: carry, reserves, capex,
+            and overruns. If liquidity is thin relative to exposure, I assume extensions become harder.”
+          </>
         </Callout>
 
         <MiniMath
-          label="Mini example (keep numbers round)"
+          label="Quick supportability check (round numbers)"
           rows={[
-            ["Downside NOI", "$2.0mm"],
-            ["Target debt yield", "8.5%"],
-            ["Max loan", "~$23.5mm"],
+            ["Annual carry (rough)", "$1.5mm"],
+            ["Capex / TI exposure", "$3.0mm"],
+            ["Needed cushion", "~$4–6mm+"],
           ]}
-          note="Then say: ‘I’d confirm DSCR at stressed SOFR and verify the exit works.’"
+          note="This isn’t exact math. It shows judgment about what matters."
         />
       </Section>
 
-      <Section title="4) Underwrite the exit (this is where deals break)">
-        <WhatTheyTest>
-          Whether you underwrite takeout realistically: rate, cap, and lender appetite.
-        </WhatTheyTest>
+      <Section title="3) Track record: ask for ‘same deal’ experience">
+        <Card
+          title="What they’re testing"
+          description="That you can distinguish ‘owns real estate’ from ‘has executed this plan’—and you ask questions that reveal execution quality."
+        />
 
-        <Callout title="Say this out loud">
-          “I underwrite the refi at a realistic takeout rate and stressed exit cap, not a best-case.
-          If the takeout doesn’t clear with reasonable assumptions, I either lower proceeds, add structure,
-          or pass.”
+        <Callout title="The question that sounds like a lender">
+          <>
+            “Walk me through your last 2–3 deals that look like this — what went wrong,
+            and what did you do when timing slipped or NOI underperformed?”
+          </>
         </Callout>
 
-        <ul className="list-disc pl-6 space-y-2 text-gray-700">
-          <li>Exit cap: stressed vs market comps</li>
-          <li>Takeout DSCR: lender requirement</li>
-          <li>Timing risk: does stabilization happen before maturity?</li>
-        </ul>
-      </Section>
-
-      <Section title="5) Name the risks (and how you’d protect the loan)">
-        <WhatTheyTest>
-          Whether you can identify the real loss drivers and match protections to risks.
-        </WhatTheyTest>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card title="Top risks (examples)">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>Lease-up delay / tenant credit</li>
-              <li>Capex overruns / construction timing</li>
-              <li>Expense growth (taxes/insurance)</li>
-              <li>Market move (cap rates / liquidity)</li>
-            </ul>
-          </Card>
-          <Card title="Protections (examples)">
-            <ul className="list-disc pl-6 space-y-2 text-gray-700">
-              <li>Interest + capex reserves</li>
-              <li>Cash management triggers</li>
-              <li>Milestones / covenants</li>
-              <li>Guarantees where warranted</li>
-            </ul>
-          </Card>
-        </div>
-
-        <Callout title="How to finish your answer">
-          “Net, I’m comfortable if downside debt yield holds, exit clears at realistic assumptions,
-          and structure covers timing risk. If any one of those fails, I’ll adjust proceeds or pass.”
+        <Callout title="What you’re listening for">
+          <List
+            items={[
+              <>Concrete examples (not vague “we crushed it”)</>,
+              <>Lessons learned and process improvements</>,
+              <>Ability to manage vendors/PM/leasing</>,
+              <>Honest discussion of mistakes</>,
+            ]}
+          />
         </Callout>
       </Section>
 
-      <BottomNav />
-    </main>
-  );
-}
+      <Section title="4) Hidden killers: concentration and bandwidth">
+        <Card
+          title="What they’re testing"
+          description="That you recognize ‘too many projects / thin team’ as a real default driver and you look at maturities and platform leverage."
+        />
 
-/* ---------- helpers ---------- */
+        <Grid>
+          <Card title="Concentration red flags">
+            <List
+              items={[
+                <>Multiple deals maturing in the same window</>,
+                <>High exposure to one market or tenant type</>,
+                <>Heavy reliance on one equity partner</>,
+              ]}
+            />
+          </Card>
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-12">
-      <h2 className="text-2xl font-semibold mb-4">{title}</h2>
-      <div className="space-y-6">{children}</div>
-    </section>
-  );
-}
+          <Card title="Bandwidth red flags">
+            <List
+              items={[
+                <>Small team managing heavy capex/lease-up</>,
+                <>Outsourced leasing without strong oversight</>,
+                <>Key-person risk (one operator runs everything)</>,
+              ]}
+            />
+          </Card>
+        </Grid>
+      </Section>
 
-function WhatTheyTest({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border bg-white p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-2">What they’re testing</p>
-      <p className="text-gray-700">{children}</p>
-    </div>
-  );
-}
+      <Section title="5) Red flags → how it changes structure (or kills the deal)">
+        <Card
+          title="What they’re testing"
+          description="That you translate sponsor risk into lender actions: lower proceeds, more reserves, tighter control, stronger guarantees, or pass."
+        />
 
-function Callout({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border bg-gray-50 p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-2">{title}</p>
-      <div className="text-gray-800">{children}</div>
-    </div>
-  );
-}
+        <Callout title="Red flags and what you do">
+          <List
+            items={[
+              <>
+                <b>Thin liquidity</b> → lower proceeds, larger interest reserve, tighter cash management
+              </>,
+              <>
+                <b>Limited track record</b> → milestones, reporting, stronger controls (and guarantees where warranted)
+              </>,
+              <>
+                <b>Aggressive plan</b> → haircut NOI, stress timeline, reduce leverage
+              </>,
+            ]}
+          />
+        </Callout>
+      </Section>
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border bg-white p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-3">{title}</p>
-      {children}
-    </div>
-  );
-}
-
-function MiniMath({
-  label,
-  rows,
-  note,
-}: {
-  label: string;
-  rows: [string, string][];
-  note?: string;
-}) {
-  return (
-    <div className="rounded-2xl border bg-white p-5">
-      <p className="text-sm font-semibold text-gray-900 mb-3">{label}</p>
-      <div className="space-y-2">
-        {rows.map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between gap-4">
-            <span className="text-gray-700">{k}</span>
-            <span className="font-semibold text-gray-900">{v}</span>
-          </div>
-        ))}
-      </div>
-      {note ? <p className="mt-3 text-sm text-gray-600">{note}</p> : null}
-    </div>
-  );
-}
-
-function QuickFramework() {
-  return (
-    <div className="rounded-2xl border bg-gray-50 p-6">
-      <h2 className="text-xl font-semibold mb-2">The answer structure (memorize this)</h2>
-      <ol className="list-decimal pl-6 space-y-2 text-gray-800">
-        <li>Deal story + business plan</li>
-        <li>NOI build (key assumptions)</li>
-        <li>Size the loan (downside first)</li>
-        <li>Exit underwriting (cap + takeout rate)</li>
-        <li>Risks + protections (structure)</li>
-      </ol>
-    </div>
-  );
-}
-
-function BottomNav() {
-  return (
-    <div className="mt-14 flex flex-wrap gap-3">
-      <Link
-        href="/interview-prep"
-        className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 transition"
-      >
-        Back to Hub
-      </Link>
-      <Link
-        href="/board"
-        className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50 transition"
-      >
-        Browse Jobs
-      </Link>
-      <Link
-        href="/alerts"
-        className="rounded-lg bg-black text-white px-4 py-2 text-sm hover:opacity-90 transition"
-      >
-        Get Weekly Alerts
-      </Link>
-    </div>
+      <BottomCtas />
+    </PageShell>
   );
 }
