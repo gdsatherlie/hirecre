@@ -1,36 +1,70 @@
 export const metadata = {
   title: "Resources | HireCRE",
   description:
-    "Commercial real estate career resources: modeling courses, certifications, and foundational books.",
+    "Curated commercial real estate career resources: foundational books and recommended learning.",
 };
 
-function Card({
-  title,
-  body,
-  href,
-  cta = "Explore",
-}: {
+type Resource = {
   title: string;
-  body: string;
+  description: string;
   href: string;
-  cta?: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="text-base font-semibold text-slate-900">{title}</div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+  cta: string;
+  badge?: string;
+};
 
-      <div className="mt-4">
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-        >
-          {cta} <span aria-hidden>→</span>
-        </a>
+const BOOKS: Resource[] = [
+  {
+    title: "The Real Estate Game",
+    description:
+      "A behind-the-scenes look at how major real estate deals actually get done—smart, practical, and timeless.",
+    href: "https://www.amazon.com/dp/068485550X?tag=hirecre-20",
+    cta: "View on Amazon",
+    badge: "Classic",
+  },
+  {
+    title: "Real Estate Finance and Investments",
+    description:
+      "A technical backbone for real estate underwriting: cash flows, valuation, risk, and capital structure.",
+    href: "https://www.amazon.com/dp/B0D49YF7LK?tag=hirecre-20",
+    cta: "View on Amazon",
+    badge: "Finance",
+  },
+  {
+    title: "Best Ever Apartment Syndication Book",
+    description:
+      "Practical guide to multifamily syndication, deal structure, and raising capital—highly actionable.",
+    href: "https://www.amazon.com/dp/0997454326?tag=hirecre-20",
+    cta: "View on Amazon",
+    badge: "Multifamily",
+  },
+];
+
+function ResourceCard({ r }: { r: Resource }) {
+  return (
+    <a
+      href={r.href}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="text-base font-semibold text-slate-900">{r.title}</div>
+        {r.badge ? (
+          <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+            {r.badge}
+          </span>
+        ) : null}
       </div>
-    </div>
+
+      <p className="mt-2 text-sm leading-6 text-slate-600">{r.description}</p>
+
+      <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+        {r.cta}
+        <span aria-hidden className="transition group-hover:translate-x-1">
+          →
+        </span>
+      </div>
+    </a>
   );
 }
 
@@ -48,98 +82,34 @@ export default function ResourcesPage() {
         </h1>
 
         <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
-          A short, curated list of training and reading that actually helps with recruiting,
-          interviews, and on-the-job performance in commercial real estate.
+          A curated list of foundational reading. These are practical, high-signal
+          recommendations for anyone recruiting, interviewing, or leveling up in
+          commercial real estate.
         </p>
       </header>
 
-      {/* SECTION: COURSES */}
-      <section className="mb-12">
-        <div className="mb-5 flex items-end justify-between gap-6">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">
-              Financial Modeling Courses
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Best for acquisitions, development, and debt roles.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card
-            title="Adventures in CRE"
-            body="Industry-standard CRE modeling training built by real estate private equity professionals. Practical and role-relevant."
-            href="YOUR_AICRE_AFFILIATE_LINK"
-            cta="Explore"
-          />
-
-          <Card
-            title="Wall Street Prep"
-            body="Institutional modeling platform used by investment banks and real estate firms. Great if you're targeting more structured finance roles."
-            href="YOUR_WSP_AFFILIATE_LINK"
-            cta="Explore"
-          />
-        </div>
-      </section>
-
-      {/* SECTION: CERTIFICATIONS */}
-      <section className="mb-12">
-        <div className="mb-5">
-          <h2 className="text-xl font-bold text-slate-900">
-            Certifications & Designations
-          </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Credibility builders (especially relevant for brokerage and investment sales).
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card
-            title="CCIM"
-            body="One of the most respected designations in commercial real estate—useful for long-term credibility and technical foundation."
-            href="YOUR_CCIM_LINK"
-            cta="Learn more"
-          />
-        </div>
-      </section>
-
-      {/* SECTION: BOOKS */}
-      <section className="mb-10">
+      {/* BOOKS */}
+      <section>
         <div className="mb-5">
           <h2 className="text-xl font-bold text-slate-900">Foundational Books</h2>
           <p className="mt-1 text-sm text-slate-600">
-            The short list: practical + foundational.
+            Start here. These cover how deals work, how underwriting works, and how
+            capital gets assembled.
           </p>
         </div>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <Card
-            title="The Real Estate Game"
-            body="A behind-the-scenes look at how major real estate deals actually get done."
-            href=https://www.amazon.com/dp/068485550X?tag=hirecre-20
-            cta="View"
-          />
-          <Card
-            title="Real Estate Finance and Investments"
-            body="The technical backbone of real estate finance. Dense, but foundational."
-            href="YOUR_AMAZON_LINK_2"
-            cta="View"
-          />
-          <Card
-            title="Best Ever Apartment Syndication Book"
-            body="Practical breakdown of multifamily syndication and capital structuring."
-            href="YOUR_AMAZON_LINK_3"
-            cta="View"
-          />
+          {BOOKS.map((r) => (
+            <ResourceCard key={r.title} r={r} />
+          ))}
         </div>
       </section>
 
       {/* DISCLOSURE */}
       <div className="mt-12 rounded-2xl border border-slate-200 bg-white p-5">
         <p className="text-xs leading-5 text-slate-500">
-          Some links on this page are affiliate links. HireCRE may earn a commission at no
-          additional cost to you.
+          Disclosure: Some links on this page are affiliate links. HireCRE may earn
+          a commission at no additional cost to you.
         </p>
       </div>
     </main>
