@@ -106,6 +106,11 @@ const EQUITY: LinkItem[] = [
   description: "Definition, formula, value sensitivity, and how to explain compression vs expansion in interviews.",
   href: "/interview-prep/cap-rate-explained",
 },
+  {
+  title: "How to Explain IRR in an Interview",
+  description: "Plain-English IRR, timing intuition, IRR vs MOIC, and clean interview framing.",
+  href: "/interview-prep/explain-irr-interview",
+},
 ];
 
 const AM: LinkItem[] = [
