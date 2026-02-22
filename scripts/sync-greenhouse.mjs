@@ -64,6 +64,17 @@ function sourcesFilePath() {
   return path.join(process.cwd(), "scripts", "greenhouse_sources.txt");
 }
 
+/**
+ * Accepts any of these line formats:
+ *  - berkadia
+ *  - https://boards.greenhouse.io/berkadia
+ *  - https://job-boards.greenhouse.io/berkadia
+ *  - boards.greenhouse.io/berkadia
+ *  - job-boards.greenhouse.io/berkadia
+ *  - https://boards-api.greenhouse.io/v1/boards/berkadia/jobs
+ *
+ * Returns "berkadia".
+ */
 function cleanGreenhouseSlug(input) {
   const raw = normalize(input);
   if (!raw) return null;
@@ -71,10 +82,14 @@ function cleanGreenhouseSlug(input) {
   let s = raw
     .replace(/^https?:\/\//i, "")
     .replace(/^www\./i, "")
+    .replace(/^job-boards\.greenhouse\.io\//i, "") // ✅ NEW (your sheet uses job-boards)
     .replace(/^boards\.greenhouse\.io\//i, "")
     .replace(/^boards-api\.greenhouse\.io\/v1\/boards\//i, "");
 
+  // strip trailing paths, queries, hashes
   s = s.split("?")[0].split("#")[0].split("/")[0];
+
+  // keep only common slug characters
   s = s.toLowerCase().replace(/[^a-z0-9_-]/g, "");
 
   return s || null;
@@ -135,13 +150,13 @@ async function markStaleInactive(companySlug, runIso) {
 }
 
 /* ===============================
-   NEW: ALLOWLIST ENFORCEMENT
+   ALLOWLIST ENFORCEMENT
 ================================= */
 
 async function enforceAllowlist(sources) {
   if (!sources.length) return;
 
-  const formatted = `(${sources.map(s => `'${s}'`).join(",")})`;
+  const formatted = `(${sources.map((s) => `'${s}'`).join(",")})`;
 
   const { error } = await supabase
     .from("jobs")
