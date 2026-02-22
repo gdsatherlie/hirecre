@@ -1,228 +1,46 @@
-rxr
-smartrent
-americancapitalgroup
-metropolis
-lincoln
-extenteam
-genea
-vts
-assetliving
-abodo
-ownwell
-fairsteadescllc
-winhomeinspection
-glaciergrid
-soundpointcapital
-hover
-theagencyre
-freestonecapitalmanagement
-iconiq
-trigild
-krollbondratingagency
-birgo
-lpc
-newleafenergy
-comstock
-nycedc
-obligo
-wallstreetprep
-berkadia
-metropolitancommercialbank
-divcowest
-turbotenant
-vanmetre
-firstkeyhomes
-prophero
-transactlyconnect
-venncity
-groma
-kasaliving
-decimainternational
-crexi
-getbuilt
-lineagefinance
-osnational
-northspyre
-biomedrealty
-orchard
-rebuilt
-roofstock
-trepp
-industrious
-olympusproperty
-rclco
-concordsummit
-longmark
-realtymogul
-ylopo
-urbancompass
-thesciongroupllc
-spyderconstruction
-bgeinc
-storable
-transactlycoordinators
-storespace
-centennial
-davisdevelopment
-rexfordindustrial
-unisonhomeownershipinvestors
-dlpcapital
-cloudkitchens
-speedbaywarehousesolutions
-butlr
-homelight
-kiavi
-figure
-pointdigitalfinance
-released
-acres
-americanhomes4rent
-americantower
-apollo
-appfolio
-aresmanagement
-avalonbay
-better
-billd
-blackstone
-blend
-blueground
-bostonproperties
-boweryvaluation
-brixmor
-brookfield
-buildium
-buildout
-buildots
-cadre
-cadre
-camdenliving
-casago
-cherre
-clp
-commonliving
-compstak
-compstak
-compass
-construction
-crowncastle
-cubesmart
-dealcloud
-digitalrealty
-divvy
-divvyhomes
-doorstead
-doorloop
-doxel
-dwsrealestate
-eastdilsecured
-equinix
-entrata
-equitylifestyle
-equityresidential
-essexpropertytrust
-extraspace
-federalrealty
-figuretechnologies
-firstindustrial
-flow
-flockhomes
-freddiemacmultifamily
-fundrise
-gamingleisureproperties
-getcover
-greatjones
-greystone
-greystar
-hines
-hippo
-homebot
-homeward
-hometap
-hudsonpacific
-inspectionnation
-invitationhomes
-investor
-iwg
-jamestown
-junipersquare
-kkrrealestate
-kilroyrealty
-kimcorealty
-kiterealtygroup
-knotel
-latch
-laddercapital
-landing
-leaseaccelerator
-leasequery
-lemonade
-lendinvest
-lendinghome
-loopnet
-macerich
-matterport
-measurabl
-mesawestcapital
-midamericaapartmentcommunities
-mondayproperties
-morty
-mrisoftware
-mynd
-naiglobal
-netstreit
-newmark
-nextinsurance
-nuveenrealestate
-odessa
-offerpad
-oldsecondnationalbank
-opendoor
-opendoorhomes
-orchestra
-pave
-pclconstruction
-peerstreet
-pgimrealestate
-pillar
-placester
-plaid
-plangrid
-plenty
-pointdigitalfinance
-procore
-prologis
-publicstorage
-realpage
-realtyincome
-redfin
-reonomy
-released
-rentmanager
-rentprep
-rently
-resideliving
-rooffr
-roofr
-simonpropertygroup
-slgreenrealty
-sonder
-starwoodcapital
-stessa
-suncommunities
-tanger
-tenantcloud
-terrenorealty
-tishmanspeyer
-topagentnetwork
-transwestern
-trulia
-udrinc
-urbanedgeproperties
-vacasa
-vornadorealtytrust
-walkeranddunlop
-wework
-welltower
-wpcarey
-yardi
+615 Ventures
+Archipelago Analytics Inc.
+Ascent Developer Solutions
+Asset Living
+Berkadia
+BioMed Realty
+Centennial Real Estate Company LLC
+Concord Summit Capital LLC
+CRE 360
+Crexi
+Davidson Kempner
+Davis Development
+DivcoWest
+DLP Capital
+Faropoint
+GCM Grosvenor
+HPS Investment Partners
+Iconiq
+KBRA
+Lincoln Property Company
+Lineage Technologies
+LoanCore
+Lpc
+Maverick RE
+Metropolitan Commercial Bank
+Newcastle investors
+Northmarq
+Northspyre
+Olympus Property
+Piermont Bank
+Prometheus Real Estate Group
+Rclco
+RealtyMogul
+Redstone Residential
+Reside Living
+Rexford Industrial
+RXR
+Ryan Stuart Development
+Sands Investment Group
+Sound Point Capital
+Sound Point Capital Management
+Sunrise Management
+The Durst Organization
+The Scion Group
+TPG
+VTS
