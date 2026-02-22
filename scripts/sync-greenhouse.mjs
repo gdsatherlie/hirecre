@@ -2,7 +2,7 @@
 /**
  * scripts/sync-greenhouse.mjs
  *
- * Reads scripts/greenhouse_sources.txt (one Greenhouse board slug per line),
+ * Reads scripts/greenhouse_sources.txt (one Greenhouse board slug OR board URL per line),
  * pulls jobs from Greenhouse JSON endpoint, filters out unwanted titles,
  * upserts into Supabase, and marks stale jobs inactive per company.
  *
@@ -30,73 +30,53 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-// ---- EXCLUSIONS: edit these any time (title-based) ----
-// Goal: remove facilities / building ops / low-signal roles (while keeping CRE + leasing + proptech)
+// -----------------------------------------------------------------------------
+// Title-based exclusions (keep CRE + leasing + proptech; remove facilities/ops noise)
+// IMPORTANT: These are substring matches (case-insensitive).
+// Keep this list HIGH-signal. Avoid exact job titles.
+// -----------------------------------------------------------------------------
 const EXCLUDE_TITLE_KEYWORDS = [
-  // Building ops / facilities / maintenance
+  // Facilities / building ops
   "facilities",
   "facility",
   "maintenance",
   "maintenance technician",
   "property maintenance",
-  "building engineer",
-  "engineer (facilities)",
-  "chief engineer",
-  "grounds",
-  "groundskeeper",
-  "porter",
   "janitor",
   "janitorial",
+  "porter",
+  "grounds",
+  "groundskeeper",
+  "landscaping",
+  "landscape",
   "housekeeper",
   "housekeeping",
   "custodian",
   "cleaner",
   "cleaning",
-  "landscaping",
-  "landscape",
   "security guard",
   "security officer",
   "concierge",
   "valet",
-  "housekeeper",
-  "landscape supervisor",
-  "landscaper",
-  "Porter",
-  "Design Manager",
-  "Post Closing Specialist - Recording",
-  "Admin Post-Settlement Intern, Valencia",
-  "Customer Care Specialist",
-  "Senior Security Engineer",
-  "Staff Software Engineer, Activate",
-  "Shopify Administrator",
-  "Accounts Receivable Admin Specialist",
-  "Seasonal Linen Specialist",
-  "Seasonal Runner",
-  "General Manager",
-  "Front Desk Agent",
-  
-  
+  "service technician",
 
-  // Food / hospitality (common noise on large operators)
+  // Hospitality noise (some operators post these on GH)
+  "front desk",
+  "front-desk",
+  "bellman",
   "cook",
   "server",
   "bartender",
 
-  // Blue-collar / logistics
+  // Blue-collar/logistics noise
   "warehouse",
   "driver",
   "delivery",
-  "service technician",
+  "runner",
+  "linen",
+  "grounds crew",
 
-  // Support IT (but NOT generic “engineering” — we want proptech roles to remain)
-  "helpdesk",
-  "desktop support",
-  "it support",
-  "network administrator",
-  "systems administrator",
-  "influencer marketing",
-
-  // Not your audience (agents)
+  // Agent-type roles (not your audience)
   "licensed real estate agent",
   "real estate agent",
 ];
@@ -183,7 +163,6 @@ const STATE_NAME_TO_ABBR = new Map(Object.entries({
 }));
 
 function looksLikeStreetAddress(s) {
-  // If it starts with a number OR contains "Suite/Ste/Apt/#" etc, it’s probably an address.
   const v = normalize(s);
   if (!v) return false;
   if (/^\d{1,6}\s/.test(v)) return true;
@@ -192,31 +171,19 @@ function looksLikeStreetAddress(s) {
 }
 
 function parseLocationUS(locationRaw) {
-  // Goal: return { city, state } where state is 2-letter, and city is a city-ish string.
-  // Handles:
-  // - "Chicago, IL"
-  // - "Phoenix, Arizona, United States"
-  // - "10777 Westheimer Road, Suite 400, Houston, Texas 77042"
-  // - "Boca Raton" (no state)
-  // - "Remote - US" / "Remote" / "United States"
   const raw = normalize(locationRaw);
   if (!raw) return { city: null, state: null };
 
   const lower = raw.toLowerCase();
 
-  // Remote handling
   if (lower.includes("remote")) {
     return { city: "Remote", state: null };
   }
 
-  // 1) Try to extract a 2-letter state abbreviation anywhere near the end or before ZIP
-  // Examples: ", TX" or ", TX 78728" or " Houston, TX" etc.
   const abbrMatch = raw.match(/\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?$/);
   let state = abbrMatch?.[1] && STATE_ABBRS.has(abbrMatch[1]) ? abbrMatch[1] : null;
 
-  // 2) If not found, try full state name anywhere
   if (!state) {
-    // Look for the longest state name match (e.g., "new york")
     let found = null;
     for (const [name, abbr] of STATE_NAME_TO_ABBR.entries()) {
       if (lower.includes(name)) found = abbr;
@@ -224,21 +191,13 @@ function parseLocationUS(locationRaw) {
     state = found;
   }
 
-  // 3) City extraction rules
-  // Prefer patterns like: "... , City, ST" or "... , City, StateName"
-  // For address strings, the city is typically the token before the state token.
   let city = null;
-
-  // Split by commas (most GH locations are comma-delimited)
   const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
 
   if (parts.length >= 2) {
-    // If we have a known state, find which part contains it (abbr or name), then city is the part before it.
     if (state) {
-      // find state index by abbreviation token
       let stateIdx = -1;
 
-      // try exact abbr in parts
       for (let i = 0; i < parts.length; i++) {
         const p = parts[i];
         if (new RegExp(`\\b${state}\\b`).test(p)) {
@@ -247,7 +206,6 @@ function parseLocationUS(locationRaw) {
         }
       }
 
-      // if not found by abbr, try by state name
       if (stateIdx === -1) {
         for (let i = 0; i < parts.length; i++) {
           const pl = parts[i].toLowerCase();
@@ -261,7 +219,6 @@ function parseLocationUS(locationRaw) {
         }
       }
 
-      // city is the part right before the state part (common for addresses)
       if (stateIdx > 0) {
         const candidate = parts[stateIdx - 1];
         if (candidate && !looksLikeStreetAddress(candidate) && candidate.toLowerCase() !== "united states") {
@@ -269,7 +226,6 @@ function parseLocationUS(locationRaw) {
         }
       }
 
-      // fallback: if format is "City, ST" the first part is city
       if (!city && parts.length >= 2) {
         const candidate = parts[0];
         if (candidate && !looksLikeStreetAddress(candidate) && candidate.toLowerCase() !== "united states") {
@@ -277,14 +233,12 @@ function parseLocationUS(locationRaw) {
         }
       }
     } else {
-      // No state available — maybe "City, Country" etc. Keep city if it doesn’t look like an address.
       const candidate = parts[0];
       if (candidate && !looksLikeStreetAddress(candidate) && candidate.toLowerCase() !== "united states") {
         city = candidate;
       }
     }
   } else {
-    // Single token location like "Boca Raton" or "United States"
     if (raw.toLowerCase() !== "united states" && !looksLikeStreetAddress(raw)) {
       city = raw;
     }
@@ -300,13 +254,54 @@ function sourcesFilePath() {
   return path.join(process.cwd(), "scripts", "greenhouse_sources.txt");
 }
 
+/**
+ * Accepts any of these line formats:
+ *  - berkadia
+ *  - https://boards.greenhouse.io/berkadia
+ *  - boards.greenhouse.io/berkadia
+ *  - https://boards-api.greenhouse.io/v1/boards/berkadia/jobs
+ *
+ * Returns "berkadia".
+ */
+function cleanGreenhouseSlug(input) {
+  const raw = normalize(input);
+  if (!raw) return null;
+
+  let s = raw
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/^boards\.greenhouse\.io\//i, "")
+    .replace(/^boards-api\.greenhouse\.io\/v1\/boards\//i, "");
+
+  // strip trailing paths, queries, hashes
+  s = s.split("?")[0].split("#")[0].split("/")[0];
+
+  // keep only common slug characters
+  s = s.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+
+  return s || null;
+}
+
 function readSources() {
   const file = sourcesFilePath();
   const txt = fs.readFileSync(file, "utf8");
-  return txt
+
+  const rawLines = txt
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("#"));
+
+  const slugs = [];
+  for (const line of rawLines) {
+    const slug = cleanGreenhouseSlug(line);
+    if (slug) slugs.push(slug);
+  }
+
+  // de-dupe while preserving order
+  const seen = new Set();
+  const unique = slugs.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
+
+  return unique;
 }
 
 async function fetchGreenhouseJobs(companySlug) {
@@ -373,7 +368,6 @@ async function main() {
         }
 
         const locationRaw = normalize(j?.location?.name) || normalize(j?.location?.location) || null;
-
         const { city, state } = parseLocationUS(locationRaw);
 
         const { has_pay, pay_extracted } = computePayFields({
@@ -394,6 +388,7 @@ async function main() {
           source_job_id: sourceJobId,
           source_company: companySlug,
 
+          // Note: this is still the slug. If you want display names, we’ll add mapping next.
           title,
           company: companySlug,
 
