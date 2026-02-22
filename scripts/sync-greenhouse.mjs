@@ -108,43 +108,29 @@ function cleanGreenhouseSlug(input) {
  *  [{ slug: "berkadia", companyName: "Berkadia" }, ...]
  */
 function readSources() {
-  const txt = fs.readFileSync(sourcesFilePath(), "utf8");
+  const file = sourcesFilePath();
+  const txt = fs.readFileSync(file, "utf8");
 
-  const lines = txt
+  const rawLines = txt
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("#"));
 
-  const out = [];
-  const seen = new Set();
-
-  for (const line of lines) {
+  const slugs = [];
+  for (const line of rawLines) {
+    // If TSV: "Company Name<TAB>URL"
     const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
 
-    let companyName = null;
-    let slugOrUrl = null;
-
-    if (parts.length >= 2) {
-      companyName = parts[0];
-      slugOrUrl = parts[1];
-    } else {
-      slugOrUrl = parts[0];
-      companyName = null; // fallback below
-    }
+    // Use URL column if present, otherwise treat line as slug/url
+    const slugOrUrl = parts.length >= 2 ? parts[1] : parts[0];
 
     const slug = cleanGreenhouseSlug(slugOrUrl);
-    if (!slug) continue;
-
-    if (seen.has(slug)) continue;
-    seen.add(slug);
-
-    out.push({
-      slug,
-      companyName: companyName || slug, // fallback if not provided
-    });
+    if (slug) slugs.push(slug);
   }
 
-  return out;
+  // de-dupe while preserving order
+  const seen = new Set();
+  return slugs.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
 }
 
 /* ===============================
