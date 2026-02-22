@@ -178,19 +178,15 @@ async function markStaleInactive(companySlug, runIso) {
    ALLOWLIST ENFORCEMENT
 ================================= */
 
-async function enforceAllowlist(slugs) {
-  if (!slugs.length) return;
+async function enforceAllowlist(sources) {
+  if (!sources?.length) return;
 
-  const formatted = `(${slugs.map((s) => `'${s}'`).join(",")})`;
-
-  const { error } = await supabase
-    .from("jobs")
-    .update({ is_active: false })
-    .eq("source", "greenhouse")
-    .not("source_company", "in", formatted);
+  const { error } = await supabase.rpc(
+    "deactivate_removed_greenhouse_sources",
+    { allowed_sources: sources }
+  );
 
   if (error) throw error;
-
   console.log("Allowlist enforcement complete.");
 }
 
