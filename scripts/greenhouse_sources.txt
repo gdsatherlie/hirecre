@@ -1,42 +1,42 @@
-615 Ventures	https://job-boards.greenhouse.io/615ventures
-Archipelago Analytics Inc.	https://job-boards.greenhouse.io/onarchipelago
-Ascent Developer Solutions	https://job-boards.greenhouse.io/ascentds
-Asset Living	https://job-boards.greenhouse.io/assetliving?error=true
-Berkadia	https://job-boards.greenhouse.io/berkadia
-BioMed Realty	https://job-boards.greenhouse.io/biomedrealty?error=true
-Centennial Real Estate Company	https://job-boards.greenhouse.io/centennial
-Concord Summit Capital LLC	https://job-boards.greenhouse.io/concordsummit
-CRE 360	https://job-boards.greenhouse.io/cre360
-Crexi	https://job-boards.greenhouse.io/crexi
-Davis Development	https://job-boards.greenhouse.io/davisdevelopment
-DivcoWest	https://job-boards.greenhouse.io/divcowest
-DLP Capital	https://job-boards.greenhouse.io/dlpcapital
-Faropoint	https://job-boards.greenhouse.io/faropoint
-GCM Grosvenor	https://job-boards.greenhouse.io/gcmgrosvenor
-HPS Investment Partners	https://job-boards.greenhouse.io/hpsinvestmentpartners
-Iconiq	https://job-boards.greenhouse.io/iconiq
-KBRA	https://job-boards.greenhouse.io/krollbondratingagency
-Lincoln Property Company	https://job-boards.greenhouse.io/lpc
-Lineage Technologies	https://job-boards.greenhouse.io/lineagefinance?error=true
-LoanCore	https://job-boards.greenhouse.io/loancore
-Metropolitan Commercial Bank	https://job-boards.greenhouse.io/metropolitancommercialbank
-Newcastle investors	https://job-boards.greenhouse.io/newcastleinvestors?error=true
-Northmarq	https://job-boards.greenhouse.io/northmarq
-Northspyre	https://job-boards.greenhouse.io/northspyre
-Olympus Property	https://job-boards.greenhouse.io/olympusproperty
-Piermont Bank	https://job-boards.greenhouse.io/piermontbank
-Prometheus Real Estate Group	https://job-boards.greenhouse.io/prometheusrealestategroup
-Rclco	https://job-boards.greenhouse.io/rclco
-RealtyMogul	https://job-boards.greenhouse.io/realtymogul?error=true
-Redstone Residential	https://job-boards.greenhouse.io/redstoneresidential
-Reside Living	https://job-boards.greenhouse.io/resideliving
-Rexford Industrial	https://job-boards.greenhouse.io/rexfordindustrial
-RXR	https://job-boards.greenhouse.io/rxr
-Ryan Stuart Development	https://job-boards.greenhouse.io/ryanstuartdev
-Sands Investment Group	https://job-boards.greenhouse.io/sandsinvestmentgroup
-Sound Point Capital	https://job-boards.greenhouse.io/soundpointcapital?error=true
-Sunrise Management	https://job-boards.greenhouse.io/sunrise
-The Durst Organization	https://job-boards.greenhouse.io/thedurstorganization
-The Scion Group	https://job-boards.greenhouse.io/thesciongroupllc?error=true
-TPG	https://job-boards.greenhouse.io/tpgcareers?error=true
-VTS	https://job-boards.greenhouse.io/vts?error=true
+615ventures
+onarchipelago
+ascentds
+assetliving
+berkadia
+biomedrealty
+centennial
+concordsummit
+cre360
+crexi
+davisdevelopment
+divcowest
+dlpcapital
+faropoint
+gcmgrosvenor
+hpsinvestmentpartners
+iconiq
+krollbondratingagency
+lpc
+lineagefinance
+loancore
+metropolitancommercialbank
+newcastleinvestors
+northmarq
+northspyre
+olympusproperty
+piermontbank
+prometheusrealestategroup
+rclco
+realtymogul
+redstoneresidential
+resideliving
+rexfordindustrial
+rxr
+ryanstuartdev
+sandsinvestmentgroup
+soundpointcapital
+sunrise
+thedurstorganization
+thesciongroupllc
+tpgcareers
+vts
