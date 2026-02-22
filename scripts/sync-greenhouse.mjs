@@ -63,6 +63,19 @@ const EXCLUDE_TITLE_KEYWORDS = [
   "landscaper",
   "Porter",
   "Design Manager",
+  "Post Closing Specialist - Recording",
+  "Admin Post-Settlement Intern, Valencia",
+  "Customer Care Specialist",
+  "Senior Security Engineer",
+  "Staff Software Engineer, Activate",
+  "Shopify Administrator",
+  "Accounts Receivable Admin Specialist",
+  "Seasonal Linen Specialist",
+  "Seasonal Runner",
+  "General Manager",
+  "Front Desk Agent",
+  
+  
 
   // Food / hospitality (common noise on large operators)
   "cook",
