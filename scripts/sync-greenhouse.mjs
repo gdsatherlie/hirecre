@@ -2,8 +2,12 @@
 /**
  * scripts/sync-greenhouse.mjs
  *
- * Reads scripts/greenhouse_sources.txt (one Greenhouse board slug OR board URL per line),
- * pulls jobs from Greenhouse JSON endpoint, filters out unwanted titles,
+ * Reads scripts/greenhouse_sources.txt
+ *   - supports either:
+ *       1) slug-or-url per line
+ *       2) TSV: "Company Name<TAB>slug-or-url" per line
+ *
+ * Pulls jobs from Greenhouse JSON endpoint, filters out unwanted titles,
  * upserts into Supabase, marks stale jobs inactive per company,
  * AND enforces allowlist (deactivates companies removed from sources file).
  *
@@ -82,7 +86,7 @@ function cleanGreenhouseSlug(input) {
   let s = raw
     .replace(/^https?:\/\//i, "")
     .replace(/^www\./i, "")
-    .replace(/^job-boards\.greenhouse\.io\//i, "") // ✅ NEW (your sheet uses job-boards)
+    .replace(/^job-boards\.greenhouse\.io\//i, "")
     .replace(/^boards\.greenhouse\.io\//i, "")
     .replace(/^boards-api\.greenhouse\.io\/v1\/boards\//i, "");
 
@@ -95,17 +99,52 @@ function cleanGreenhouseSlug(input) {
   return s || null;
 }
 
+/**
+ * Supports:
+ *  - slug-or-url per line
+ *  - TSV line: "Company Name<TAB>slug-or-url"
+ *
+ * Returns array of objects:
+ *  [{ slug: "berkadia", companyName: "Berkadia" }, ...]
+ */
 function readSources() {
   const txt = fs.readFileSync(sourcesFilePath(), "utf8");
 
-  const slugs = txt
+  const lines = txt
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#"))
-    .map(cleanGreenhouseSlug)
-    .filter(Boolean);
+    .filter((l) => l && !l.startsWith("#"));
 
-  return [...new Set(slugs)];
+  const out = [];
+  const seen = new Set();
+
+  for (const line of lines) {
+    const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
+
+    let companyName = null;
+    let slugOrUrl = null;
+
+    if (parts.length >= 2) {
+      companyName = parts[0];
+      slugOrUrl = parts[1];
+    } else {
+      slugOrUrl = parts[0];
+      companyName = null; // fallback below
+    }
+
+    const slug = cleanGreenhouseSlug(slugOrUrl);
+    if (!slug) continue;
+
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+
+    out.push({
+      slug,
+      companyName: companyName || slug, // fallback if not provided
+    });
+  }
+
+  return out;
 }
 
 /* ===============================
@@ -153,10 +192,10 @@ async function markStaleInactive(companySlug, runIso) {
    ALLOWLIST ENFORCEMENT
 ================================= */
 
-async function enforceAllowlist(sources) {
-  if (!sources.length) return;
+async function enforceAllowlist(slugs) {
+  if (!slugs.length) return;
 
-  const formatted = `(${sources.map((s) => `'${s}'`).join(",")})`;
+  const formatted = `(${slugs.map((s) => `'${s}'`).join(",")})`;
 
   const { error } = await supabase
     .from("jobs")
@@ -182,7 +221,10 @@ async function main() {
   let totalUpserted = 0;
   let totalErrors = 0;
 
-  for (const companySlug of sources) {
+  for (const src of sources) {
+    const companySlug = src.slug;
+    const companyName = src.companyName;
+
     try {
       const jobs = await fetchGreenhouseJobs(companySlug);
       const rows = [];
@@ -198,9 +240,9 @@ async function main() {
         rows.push({
           source: "greenhouse",
           source_job_id: sourceJobId,
-          source_company: companySlug,
+          source_company: companySlug, // slug (sync key)
           title,
-          company: companySlug,
+          company: companyName,        // ✅ human display name
           url: jobUrl,
           description: normalize(j?.content) || null,
           posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
@@ -226,8 +268,8 @@ async function main() {
     }
   }
 
-  // 🔒 Enforce GitHub allowlist globally
-  await enforceAllowlist(sources);
+  // 🔒 Enforce GitHub allowlist globally (slugs only)
+  await enforceAllowlist(sources.map((s) => s.slug));
 
   console.log("---- Summary ----");
   console.log(`Upserted: ${totalUpserted}`);
