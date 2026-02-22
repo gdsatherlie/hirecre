@@ -4,14 +4,12 @@
  *
  * Reads scripts/greenhouse_sources.txt (one Greenhouse board slug OR board URL per line),
  * pulls jobs from Greenhouse JSON endpoint, filters out unwanted titles,
- * upserts into Supabase, and marks stale jobs inactive per company.
+ * upserts into Supabase, marks stale jobs inactive per company,
+ * AND enforces allowlist (deactivates companies removed from sources file).
  *
  * Required env:
  *   SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY
- *
- * Optional env:
- *   GREENHOUSE_SOURCES_FILE (default: scripts/greenhouse_sources.txt)
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -30,58 +28,20 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-// -----------------------------------------------------------------------------
-// Title-based exclusions (keep CRE + leasing + proptech; remove facilities/ops noise)
-// IMPORTANT: These are substring matches (case-insensitive).
-// Keep this list HIGH-signal. Avoid exact job titles.
-// -----------------------------------------------------------------------------
+/* ===============================
+   TITLE EXCLUSIONS
+================================= */
+
 const EXCLUDE_TITLE_KEYWORDS = [
-  // Facilities / building ops
-  "facilities",
-  "facility",
-  "maintenance",
-  "maintenance technician",
-  "property maintenance",
-  "janitor",
-  "janitorial",
-  "porter",
-  "grounds",
-  "groundskeeper",
-  "landscaping",
-  "landscape",
-  "housekeeper",
-  "housekeeping",
-  "custodian",
-  "cleaner",
-  "cleaning",
-  "security guard",
-  "security officer",
-  "concierge",
-  "valet",
-  "service technician",
-
-  // Hospitality noise (some operators post these on GH)
-  "front desk",
-  "front-desk",
-  "bellman",
-  "cook",
-  "server",
-  "bartender",
-
-  // Blue-collar/logistics noise
-  "warehouse",
-  "driver",
-  "delivery",
-  "runner",
-  "linen",
-  "grounds crew",
-
-  // Agent-type roles (not your audience)
-  "licensed real estate agent",
-  "real estate agent",
+  "facilities","facility","maintenance","maintenance technician","property maintenance",
+  "janitor","janitorial","porter","grounds","groundskeeper","landscaping",
+  "landscape","housekeeper","housekeeping","custodian","cleaner","cleaning",
+  "security guard","security officer","concierge","valet","service technician",
+  "front desk","front-desk","bellman","cook","server","bartender",
+  "warehouse","driver","delivery","runner","linen","grounds crew",
+  "licensed real estate agent","real estate agent",
 ];
 
-// -------------------- helpers --------------------
 function normalize(s) {
   return (s || "").toString().trim();
 }
@@ -92,177 +52,18 @@ function shouldExcludeTitle(title) {
   return EXCLUDE_TITLE_KEYWORDS.some((kw) => t.includes(kw.toLowerCase()));
 }
 
-function stripHtml(html = "") {
-  return String(html)
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function extractPayFromText(text = "") {
-  const t = String(text);
-
-  const patterns = [
-    /\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:-|–|to)\s?\$\s?\d{2,3}(?:,\d{3})?(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)?/i,
-    /\$\s?\d{2,3}(?:,\d{3})+(?:\.\d{2})?\s?(?:\/year|\/yr|per year|yr|annum)/i,
-    /\$\s?\d+(?:,\d{3})*\s?(?:\/hour|\/hr|per hour|hr)/i,
-    /\b(OTE|On[-\s]?target earnings)\b.*?\$\s?\d/i,
-    /\b(base salary|salary range|compensation|pay range)\b.*?\$\s?\d/i,
-  ];
-
-  for (const re of patterns) {
-    const m = t.match(re);
-    if (m?.[0]) return m[0].replace(/\s+/g, " ").trim();
-  }
-
-  if (/\$/.test(t) && /(salary|compensation|pay|hour|year|ote)/i.test(t)) {
-    return "Pay mentioned (see listing)";
-  }
-
-  return null;
-}
-
-function computePayFields({ title, location, content, description }) {
-  const combined = `${title ?? ""}\n${location ?? ""}\n${content ?? ""}\n${description ?? ""}`;
-  const plain = stripHtml(combined);
-  const pay = extractPayFromText(plain);
-  return { has_pay: Boolean(pay), pay_extracted: pay };
-}
-
 function buildFingerprint({ source, source_job_id, url }) {
-  const a = normalize(source);
-  const b = normalize(source_job_id);
-  const c = normalize(url);
-  return `${a}::${b || c}`;
+  return `${normalize(source)}::${normalize(source_job_id) || normalize(url)}`;
 }
 
-// -------------------- location parsing --------------------
-const STATE_ABBRS = new Set([
-  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
-  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
-  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
-  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
-  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC",
-]);
+/* ===============================
+   SOURCES
+================================= */
 
-const STATE_NAME_TO_ABBR = new Map(Object.entries({
-  "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA",
-  "colorado":"CO","connecticut":"CT","delaware":"DE","florida":"FL","georgia":"GA",
-  "hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA","kansas":"KS",
-  "kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA",
-  "michigan":"MI","minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT",
-  "nebraska":"NE","nevada":"NV","new hampshire":"NH","new jersey":"NJ","new mexico":"NM",
-  "new york":"NY","north carolina":"NC","north dakota":"ND","ohio":"OH","oklahoma":"OK",
-  "oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC","south dakota":"SD",
-  "tennessee":"TN","texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA",
-  "west virginia":"WV","wisconsin":"WI","wyoming":"WY","district of columbia":"DC",
-}));
-
-function looksLikeStreetAddress(s) {
-  const v = normalize(s);
-  if (!v) return false;
-  if (/^\d{1,6}\s/.test(v)) return true;
-  if (/\b(suite|ste\.?|apt\.?|unit|#)\b/i.test(v)) return true;
-  return false;
-}
-
-function parseLocationUS(locationRaw) {
-  const raw = normalize(locationRaw);
-  if (!raw) return { city: null, state: null };
-
-  const lower = raw.toLowerCase();
-
-  if (lower.includes("remote")) {
-    return { city: "Remote", state: null };
-  }
-
-  const abbrMatch = raw.match(/\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?$/);
-  let state = abbrMatch?.[1] && STATE_ABBRS.has(abbrMatch[1]) ? abbrMatch[1] : null;
-
-  if (!state) {
-    let found = null;
-    for (const [name, abbr] of STATE_NAME_TO_ABBR.entries()) {
-      if (lower.includes(name)) found = abbr;
-    }
-    state = found;
-  }
-
-  let city = null;
-  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
-
-  if (parts.length >= 2) {
-    if (state) {
-      let stateIdx = -1;
-
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (new RegExp(`\\b${state}\\b`).test(p)) {
-          stateIdx = i;
-          break;
-        }
-      }
-
-      if (stateIdx === -1) {
-        for (let i = 0; i < parts.length; i++) {
-          const pl = parts[i].toLowerCase();
-          for (const [name, abbr] of STATE_NAME_TO_ABBR.entries()) {
-            if (abbr === state && pl.includes(name)) {
-              stateIdx = i;
-              break;
-            }
-          }
-          if (stateIdx !== -1) break;
-        }
-      }
-
-      if (stateIdx > 0) {
-        const candidate = parts[stateIdx - 1];
-        if (candidate && !looksLikeStreetAddress(candidate) && candidate.toLowerCase() !== "united states") {
-          city = candidate;
-        }
-      }
-
-      if (!city && parts.length >= 2) {
-        const candidate = parts[0];
-        if (candidate && !looksLikeStreetAddress(candidate) && candidate.toLowerCase() !== "united states") {
-          city = candidate;
-        }
-      }
-    } else {
-      const candidate = parts[0];
-      if (candidate && !looksLikeStreetAddress(candidate) && candidate.toLowerCase() !== "united states") {
-        city = candidate;
-      }
-    }
-  } else {
-    if (raw.toLowerCase() !== "united states" && !looksLikeStreetAddress(raw)) {
-      city = raw;
-    }
-  }
-
-  return { city: city || null, state: state || null };
-}
-
-// -------------------- sources + greenhouse --------------------
 function sourcesFilePath() {
-  const fromEnv = process.env.GREENHOUSE_SOURCES_FILE;
-  if (fromEnv) return fromEnv;
   return path.join(process.cwd(), "scripts", "greenhouse_sources.txt");
 }
 
-/**
- * Accepts any of these line formats:
- *  - berkadia
- *  - https://boards.greenhouse.io/berkadia
- *  - boards.greenhouse.io/berkadia
- *  - https://boards-api.greenhouse.io/v1/boards/berkadia/jobs
- *
- * Returns "berkadia".
- */
 function cleanGreenhouseSlug(input) {
   const raw = normalize(input);
   if (!raw) return null;
@@ -273,36 +74,28 @@ function cleanGreenhouseSlug(input) {
     .replace(/^boards\.greenhouse\.io\//i, "")
     .replace(/^boards-api\.greenhouse\.io\/v1\/boards\//i, "");
 
-  // strip trailing paths, queries, hashes
   s = s.split("?")[0].split("#")[0].split("/")[0];
-
-  // keep only common slug characters
   s = s.toLowerCase().replace(/[^a-z0-9_-]/g, "");
 
   return s || null;
 }
 
 function readSources() {
-  const file = sourcesFilePath();
-  const txt = fs.readFileSync(file, "utf8");
+  const txt = fs.readFileSync(sourcesFilePath(), "utf8");
 
-  const rawLines = txt
+  const slugs = txt
     .split("\n")
     .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#"));
+    .filter((l) => l && !l.startsWith("#"))
+    .map(cleanGreenhouseSlug)
+    .filter(Boolean);
 
-  const slugs = [];
-  for (const line of rawLines) {
-    const slug = cleanGreenhouseSlug(line);
-    if (slug) slugs.push(slug);
-  }
-
-  // de-dupe while preserving order
-  const seen = new Set();
-  const unique = slugs.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
-
-  return unique;
+  return [...new Set(slugs)];
 }
+
+/* ===============================
+   GREENHOUSE FETCH
+================================= */
 
 async function fetchGreenhouseJobs(companySlug) {
   const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(companySlug)}/jobs?content=true`;
@@ -321,12 +114,13 @@ async function fetchGreenhouseJobs(companySlug) {
 }
 
 async function upsertJobs(rows) {
-  if (!rows.length) return { upserted: 0 };
+  if (!rows.length) return;
 
-  const { error } = await supabase.from("jobs").upsert(rows, { onConflict: "fingerprint" });
+  const { error } = await supabase
+    .from("jobs")
+    .upsert(rows, { onConflict: "fingerprint" });
+
   if (error) throw error;
-
-  return { upserted: rows.length };
 }
 
 async function markStaleInactive(companySlug, runIso) {
@@ -340,83 +134,69 @@ async function markStaleInactive(companySlug, runIso) {
   if (error) throw error;
 }
 
-// -------------------- main --------------------
+/* ===============================
+   NEW: ALLOWLIST ENFORCEMENT
+================================= */
+
+async function enforceAllowlist(sources) {
+  if (!sources.length) return;
+
+  const formatted = `(${sources.map(s => `'${s}'`).join(",")})`;
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({ is_active: false })
+    .eq("source", "greenhouse")
+    .not("source_company", "in", formatted);
+
+  if (error) throw error;
+
+  console.log("Allowlist enforcement complete.");
+}
+
+/* ===============================
+   MAIN
+================================= */
+
 async function main() {
   const runIso = new Date().toISOString();
   const sources = readSources();
 
-  console.log(`Loaded ${sources.length} Greenhouse sources from ${sourcesFilePath()}`);
+  console.log(`Loaded ${sources.length} Greenhouse sources.`);
 
   let totalUpserted = 0;
-  let totalSkipped = 0;
   let totalErrors = 0;
 
   for (const companySlug of sources) {
     try {
       const jobs = await fetchGreenhouseJobs(companySlug);
-
       const rows = [];
+
       for (const j of jobs) {
         const title = normalize(j?.title);
         const jobUrl = normalize(j?.absolute_url);
         const sourceJobId = j?.id != null ? String(j.id) : null;
+
         if (!title || !jobUrl) continue;
-
-        if (shouldExcludeTitle(title)) {
-          totalSkipped += 1;
-          continue;
-        }
-
-        const locationRaw = normalize(j?.location?.name) || normalize(j?.location?.location) || null;
-        const { city, state } = parseLocationUS(locationRaw);
-
-        const { has_pay, pay_extracted } = computePayFields({
-          title,
-          location: locationRaw ?? "",
-          content: j?.content ?? "",
-          description: "",
-        });
-
-        const fingerprint = buildFingerprint({
-          source: "greenhouse",
-          source_job_id: sourceJobId,
-          url: jobUrl,
-        });
+        if (shouldExcludeTitle(title)) continue;
 
         rows.push({
           source: "greenhouse",
           source_job_id: sourceJobId,
           source_company: companySlug,
-
-          // Note: this is still the slug. If you want display names, we’ll add mapping next.
           title,
           company: companySlug,
-
-          location_raw: locationRaw,
-          location_city: city,
-          location_state: state,
-
-          employment_type: null,
-          job_type: null,
-
           url: jobUrl,
           description: normalize(j?.content) || null,
           posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
-
-          has_pay,
-          pay_extracted,
-
-          fingerprint,
-
+          fingerprint: buildFingerprint({
+            source: "greenhouse",
+            source_job_id: sourceJobId,
+            url: jobUrl,
+          }),
           is_active: true,
           last_seen_at: runIso,
         });
-      }
-
-      if (!rows.length) {
-        console.log(`[DONE] ${companySlug}: 0 jobs (or all filtered). Marking stale inactive...`);
-        await markStaleInactive(companySlug, runIso);
-        continue;
       }
 
       await upsertJobs(rows);
@@ -424,24 +204,18 @@ async function main() {
 
       await markStaleInactive(companySlug, runIso);
 
-      console.log(`[DONE] ${companySlug}: upserted ${rows.length}, filtered ${jobs.length - rows.length}`);
+      console.log(`[DONE] ${companySlug}: ${rows.length} active jobs.`);
     } catch (e) {
       totalErrors += 1;
-      const msg = e?.message ? e.message : String(e);
-
-      if (msg.includes("HTTP 404")) {
-        console.log(`[SKIP] ${companySlug} -> HTTP 404 (not a Greenhouse board slug)`);
-      } else if (msg.includes("Unexpected token") || msg.includes("not valid JSON")) {
-        console.log(`[ERR]  ${companySlug}: returned non-JSON (likely not a valid boards-api slug)`);
-      } else {
-        console.log(`[ERR]  ${companySlug}: ${msg}`);
-      }
+      console.log(`[ERR] ${companySlug}: ${e.message}`);
     }
   }
 
+  // 🔒 Enforce GitHub allowlist globally
+  await enforceAllowlist(sources);
+
   console.log("---- Summary ----");
   console.log(`Upserted: ${totalUpserted}`);
-  console.log(`Filtered: ${totalSkipped}`);
   console.log(`Errors:   ${totalErrors}`);
 }
 
