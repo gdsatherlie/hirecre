@@ -116,21 +116,30 @@ function readSources() {
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("#"));
 
-  const slugs = [];
+  const out = [];
+  const seen = new Set();
+
   for (const line of rawLines) {
-    // If TSV: "Company Name<TAB>URL"
+    // TSV: "Company Name<TAB>slug-or-url"
     const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
 
-    // Use URL column if present, otherwise treat line as slug/url
+    const companyName = parts.length >= 2 ? parts[0] : null;
     const slugOrUrl = parts.length >= 2 ? parts[1] : parts[0];
 
     const slug = cleanGreenhouseSlug(slugOrUrl);
-    if (slug) slugs.push(slug);
+    if (!slug) continue;
+
+    // de-dupe by slug (preserve first occurrence)
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+
+    out.push({
+      slug,
+      companyName: companyName || slug, // fallback if not provided
+    });
   }
 
-  // de-dupe while preserving order
-  const seen = new Set();
-  return slugs.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
+  return out;
 }
 
 /* ===============================
@@ -175,15 +184,15 @@ async function markStaleInactive(companySlug, runIso) {
 }
 
 /* ===============================
-   ALLOWLIST ENFORCEMENT
+   ALLOWLIST ENFORCEMENT (SAFE)
 ================================= */
 
-async function enforceAllowlist(sources) {
-  if (!sources?.length) return;
+async function enforceAllowlist(allowedSlugs) {
+  if (!allowedSlugs?.length) return;
 
   const { error } = await supabase.rpc(
     "deactivate_removed_greenhouse_sources",
-    { allowed_sources: sources }
+    { allowed_sources: allowedSlugs }
   );
 
   if (error) throw error;
@@ -203,10 +212,7 @@ async function main() {
   let totalUpserted = 0;
   let totalErrors = 0;
 
-  for (const src of sources) {
-    const companySlug = src.slug;
-    const companyName = src.companyName;
-
+  for (const { slug: companySlug, companyName } of sources) {
     try {
       const jobs = await fetchGreenhouseJobs(companySlug);
       const rows = [];
@@ -222,9 +228,9 @@ async function main() {
         rows.push({
           source: "greenhouse",
           source_job_id: sourceJobId,
-          source_company: companySlug, // slug (sync key)
+          source_company: companySlug,  // slug (sync key)
           title,
-          company: companyName,        // ✅ human display name
+          company: companyName,         // human display name (from TSV col 1)
           url: jobUrl,
           description: normalize(j?.content) || null,
           posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
@@ -246,7 +252,7 @@ async function main() {
       console.log(`[DONE] ${companySlug}: ${rows.length} active jobs.`);
     } catch (e) {
       totalErrors += 1;
-      console.log(`[ERR] ${companySlug}: ${e.message}`);
+      console.log(`[ERR] ${companySlug}: ${e?.message || String(e)}`);
     }
   }
 
