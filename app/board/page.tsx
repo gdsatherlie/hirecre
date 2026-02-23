@@ -343,20 +343,21 @@ export default function BoardPage() {
 
   // ----- Auth gate -----
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const email = data.session?.user?.email ?? null;
-      const uid = data.session?.user?.id ?? null;
+  (async () => {
+    const { data } = await supabase.auth.getSession();
+    const email = data.session?.user?.email ?? null;
+    const uid = data.session?.user?.id ?? null;
 
-      if (!email || !uid) {
-        router.push("/login");
-        return;
-      }
-
+    // No redirect. Board is public.
+    if (email && uid) {
       setUserEmail(email);
       setUserId(uid);
-    })();
-  }, [router]);
+    } else {
+      setUserEmail(null);
+      setUserId(null);
+    }
+  })();
+}, []);
 
   useEffect(() => {
     // Read last visit timestamp (if any)
