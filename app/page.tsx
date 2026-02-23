@@ -29,6 +29,10 @@ export default function HomePage() {
       a: "HireCRE is a commercial real estate job board and career resource hub. We organize CRE and proptech roles into a clean, searchable feed and publish interview prep and underwriting explainers built for real-world CRE workflows.",
     },
     {
+      q: "Do I need an account to browse jobs?",
+      a: "No. You can browse the job board without creating an account. If you want optional features like job alerts (and future saved searches), you can sign up.",
+    },
+    {
       q: "What types of commercial real estate jobs are on HireCRE?",
       a: "Roles commonly include acquisitions, asset management, development, lending/credit, capital markets, investment sales, research, property management, and proptech—across multiple markets and experience levels.",
     },
@@ -108,6 +112,10 @@ export default function HomePage() {
               and sharpen the concepts you need to explain in interviews.
             </p>
 
+            <p className="mt-3 max-w-2xl text-sm text-gray-500">
+              Browse jobs publicly — no account required.
+            </p>
+
             <div className="mt-6 flex flex-wrap gap-3">
               <Link
                 href="/board"
@@ -124,10 +132,10 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/login?signup=1"
+                href="/alerts"
                 className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
               >
-                Create account
+                Get job alerts
               </Link>
             </div>
 
@@ -211,14 +219,14 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-gray-900">More than a job board</h2>
 
             <p className="mt-2 text-sm leading-6 text-gray-600">
-              HireCRE is designed to be a centralized resource for commercial real estate careers — not just a feed of listings.
-              In addition to curated opportunities, we publish interview preparation guides, underwriting breakdowns,
-              and concept explainers that help candidates communicate like institutional practitioners.
+              HireCRE is designed to be a centralized resource for commercial real estate careers — not just a feed of
+              listings. In addition to curated opportunities, we publish interview preparation guides, underwriting
+              breakdowns, and concept explainers that help candidates communicate like institutional practitioners.
             </p>
 
             <p className="mt-4 text-sm leading-6 text-gray-600">
-              If you’re targeting acquisitions, private equity, debt funds, mortgage REITs, development shops, or brokerage platforms,
-              HireCRE gives you both the opportunities and the context to compete.
+              If you’re targeting acquisitions, private equity, debt funds, mortgage REITs, development shops, or
+              brokerage platforms, HireCRE gives you both the opportunities and the context to compete.
             </p>
           </div>
 
