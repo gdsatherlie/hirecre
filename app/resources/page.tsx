@@ -63,10 +63,11 @@ const BOOKS: Resource[] = [
     affiliate: true,
   },
 
+  // Debt / Credit
   {
-    title: "Commercial Mortgages 101 (CREFC)",
+    title: "Commercial Mortgages 101",
     description:
-      "Straightforward overview of CMBS and commercial mortgage markets.",
+      "Straightforward overview of commercial mortgages and how deals get financed.",
     href: "https://www.amazon.com/Commercial-Mortgages-101-Everything-Winning/dp/0814415075?tag=hirecre-20",
     affiliate: true,
   },
@@ -77,8 +78,7 @@ const BOOKS: Resource[] = [
     affiliate: true,
   },
 
-];
-
+  // Investing / PE
   {
     title: "Real Estate Finance & Investments (Brueggeman/Fisher) – Print",
     description: "The classic. Strong interview foundation and reference book.",
@@ -89,14 +89,14 @@ const BOOKS: Resource[] = [
     title: "The Millionaire Real Estate Investor",
     description:
       "Practical framework for evaluating deals and building conviction.",
-    href: "https://www.amazon.com/Millionaire-Real-Estate-Investor/dp/0071446370?&linkCode=ll2&tag=hirecre-20&linkId=9de99bb46ea320d2a85e05d11fd6abf3&language=en_US&ref_=as_li_ss_tl",
+    href: "https://www.amazon.com/dp/0071446375/?tag=hirecre-20",
     affiliate: true,
   },
   {
     title: "The Intelligent Investor",
     description:
       "Timeless investing principles; great for IRR/underwriting mindset.",
-    href: "https://www.amazon.com/dp/0060555661?tag=hirecre-20",
+    href: "https://www.amazon.com/dp/0060555661/?tag=hirecre-20",
     affiliate: true,
   },
 ];
@@ -219,9 +219,7 @@ export default function ResourcesPage() {
       </header>
 
       <Section title="📝 Interview & Career Prep" items={INTERVIEW} />
-      <Section title="📚 Foundational Books" items={BOOKS} />
-
-      />
+      <Section title="📚 Books (Foundational + Debt + Investing)" items={BOOKS} />
       <Section title="🧮 Modeling & Technical Training" items={MODELING} />
       <Section title="🎓 Certifications & Education" items={CERTIFICATIONS} />
       <Section title="📊 Research & Market Data" items={RESEARCH} />
