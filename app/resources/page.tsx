@@ -85,20 +85,6 @@ const BOOKS: Resource[] = [
     href: "https://www.amazon.com/dp/007365809X/?tag=hirecre-20",
     affiliate: true,
   },
-  {
-    title: "The Millionaire Real Estate Investor",
-    description:
-      "Practical framework for evaluating deals and building conviction.",
-    href: "https://www.amazon.com/dp/0071446375/?tag=hirecre-20",
-    affiliate: true,
-  },
-  {
-    title: "The Intelligent Investor",
-    description:
-      "Timeless investing principles; great for IRR/underwriting mindset.",
-    href: "https://www.amazon.com/dp/0060555661/?tag=hirecre-20",
-    affiliate: true,
-  },
 ];
 
 const MODELING: Resource[] = [
