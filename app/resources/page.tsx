@@ -24,6 +24,7 @@ const INTERVIEW: Resource[] = [
       "A complete index of every interview prep page (great for browsing and bookmarking).",
 
   },
+];
 
 const BOOKS: Resource[] = [
   {
@@ -144,8 +145,6 @@ const RESEARCH: Resource[] = [
   },
 ];
 
-
-];
 
 function Section({ title, items }: { title: string; items: Resource[] }) {
   return (
