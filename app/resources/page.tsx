@@ -18,12 +18,6 @@ const INTERVIEW: Resource[] = [
       "Role-based prep across debt, equity, acquisitions, asset management, development, leasing, and operations.",
     href: "/interview-prep",
   },
-  {
-    title: "Interview Prep Sitemap",
-    description:
-      "A complete index of every interview prep page (great for browsing and bookmarking).",
-
-  },
 ];
 
 const BOOKS: Resource[] = [
@@ -80,20 +74,17 @@ const MODELING: Resource[] = [
   },
   {
     title: "REFM Real Estate Modeling",
-    description:
-      "Professional real estate financial modeling training.",
+    description: "Professional real estate financial modeling training.",
     href: "https://www.refm.com/",
   },
   {
     title: "Break Into CRE",
-    description:
-      "Technical interview prep and modeling courses.",
+    description: "Technical interview prep and modeling courses.",
     href: "https://breakintocre.com/",
   },
   {
     title: "Wall Street Prep – Real Estate Modeling",
-    description:
-      "Institutional real estate financial modeling certification.",
+    description: "Institutional real estate financial modeling certification.",
     href: "https://www.wallstreetprep.com/",
   },
   {
@@ -145,7 +136,6 @@ const RESEARCH: Resource[] = [
   },
 ];
 
-
 function Section({ title, items }: { title: string; items: Resource[] }) {
   return (
     <section className="mt-12">
@@ -164,8 +154,8 @@ function Section({ title, items }: { title: string; items: Resource[] }) {
                 isInternal
                   ? undefined
                   : item.affiliate
-                    ? "noopener noreferrer nofollow"
-                    : "noopener noreferrer"
+                  ? "noopener noreferrer nofollow"
+                  : "noopener noreferrer"
               }
               className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
