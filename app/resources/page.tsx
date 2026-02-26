@@ -51,8 +51,7 @@ const BOOKS: Resource[] = [
   },
   {
     title: "Best Ever Apartment Syndication Book",
-    description:
-      "Practical multifamily deal structuring and capital raising.",
+    description: "Practical multifamily deal structuring and capital raising.",
     href: "https://www.amazon.com/dp/0997454326?tag=hirecre-20",
     affiliate: true,
   },
@@ -63,10 +62,13 @@ const BOOKS: Resource[] = [
     href: "https://www.amazon.com/dp/1639051120?tag=hirecre-20",
     affiliate: true,
   },
-  const DEBT_AND_CREDIT: Resource[] = [
+];
+
+const DEBT_AND_CREDIT: Resource[] = [
   {
     title: "Commercial Mortgages 101 (CREFC)",
-    description: "Straightforward overview of CMBS and commercial mortgage markets.",
+    description:
+      "Straightforward overview of CMBS and commercial mortgage markets.",
     href: "https://www.amazon.com/dp/0470521474?tag=hirecre-20",
     affiliate: true,
   },
@@ -77,12 +79,14 @@ const BOOKS: Resource[] = [
     affiliate: true,
   },
   {
-    title: "The 100 Most Important Things You Need to Know About the Real Estate Market",
+    title:
+      "The 100 Most Important Things You Need to Know About the Real Estate Market",
     description: "Good macro + market intuition for interviews and investing.",
     href: "https://www.amazon.com/dp/0071802791?tag=hirecre-20",
     affiliate: true,
   },
 ];
+
 const INVESTING_AND_PE: Resource[] = [
   {
     title: "Real Estate Finance & Investments (Brueggeman/Fisher) – Print",
@@ -92,22 +96,24 @@ const INVESTING_AND_PE: Resource[] = [
   },
   {
     title: "The Millionaire Real Estate Investor",
-    description: "Practical framework for evaluating deals and building conviction.",
+    description:
+      "Practical framework for evaluating deals and building conviction.",
     href: "https://www.amazon.com/dp/0071446375?tag=hirecre-20",
     affiliate: true,
   },
   {
     title: "The Intelligent Investor",
-    description: "Timeless investing principles; great for IRR/underwriting mindset.",
+    description:
+      "Timeless investing principles; great for IRR/underwriting mindset.",
     href: "https://www.amazon.com/dp/0060555661?tag=hirecre-20",
     affiliate: true,
   },
 ];
+
 const MODELING: Resource[] = [
   {
     title: "Adventures in CRE (A.CRE)",
-    description:
-      "Free institutional-quality Excel models and technical tutorials.",
+    description: "Free institutional-quality Excel models and technical tutorials.",
     href: "https://www.adventuresincre.com/",
   },
   {
@@ -127,8 +133,7 @@ const MODELING: Resource[] = [
   },
   {
     title: "ARGUS Enterprise",
-    description:
-      "Industry-standard commercial real estate underwriting software.",
+    description: "Industry-standard commercial real estate underwriting software.",
     href: "https://www.altusgroup.com/argus/",
   },
 ];
@@ -222,18 +227,21 @@ export default function ResourcesPage() {
         </p>
       </header>
 
-       <Section title="📝 Interview & Career Prep" items={INTERVIEW} />
+      <Section title="📝 Interview & Career Prep" items={INTERVIEW} />
       <Section title="📚 Foundational Books" items={BOOKS} />
       <Section title="💳 CRE Debt & Credit" items={DEBT_AND_CREDIT} />
-<Section title="🏢 Real Estate Investing & Private Equity" items={INVESTING_AND_PE} />
+      <Section
+        title="🏢 Real Estate Investing & Private Equity"
+        items={INVESTING_AND_PE}
+      />
       <Section title="🧮 Modeling & Technical Training" items={MODELING} />
       <Section title="🎓 Certifications & Education" items={CERTIFICATIONS} />
       <Section title="📊 Research & Market Data" items={RESEARCH} />
-    
 
       <div className="mt-12 text-xs text-slate-500">
-        Disclosure: Some links on this page are affiliate links. HireCRE may
-        earn a commission at no additional cost to you. As an Amazon Associate, HireCRE earns from qualifying purchases. 
+        Disclosure: Some links on this page are affiliate links. HireCRE may earn
+        a commission at no additional cost to you. As an Amazon Associate, HireCRE
+        earns from qualifying purchases.
       </div>
     </main>
   );
