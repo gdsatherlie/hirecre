@@ -184,11 +184,12 @@ export default function ResourcesPage() {
         </p>
       </header>
 
+       <Section title="📝 Interview & Career Prep" items={INTERVIEW} />
       <Section title="📚 Foundational Books" items={BOOKS} />
       <Section title="🧮 Modeling & Technical Training" items={MODELING} />
       <Section title="🎓 Certifications & Education" items={CERTIFICATIONS} />
       <Section title="📊 Research & Market Data" items={RESEARCH} />
-      <Section title="📝 Interview & Career Prep" items={INTERVIEW} />
+    
 
       <div className="mt-12 text-xs text-slate-500">
         Disclosure: Some links on this page are affiliate links. HireCRE may
