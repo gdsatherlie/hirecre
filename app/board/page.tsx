@@ -601,9 +601,17 @@ useEffect(() => {
             )}
           </div>
 
-          <div className="text-sm text-gray-600">
-            <span className="font-semibold text-gray-900">{count.toLocaleString()}</span> jobs
-          </div>
+<div className="text-right">
+  <div className="text-sm text-gray-600">
+    <span className="font-semibold text-gray-900">{count.toLocaleString()}</span> jobs
+  </div>
+
+  {/* NEW: page indicator under the count (matches bottom styling) */}
+  <div className="mt-1 text-sm text-gray-600">
+    Page <span className="font-semibold text-gray-900">{page}</span> of{" "}
+    <span className="font-semibold text-gray-900">{totalPages}</span>
+  </div>
+</div>
         </div>
 
         {/* Filters */}
