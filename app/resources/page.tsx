@@ -69,20 +69,20 @@ const DEBT_AND_CREDIT: Resource[] = [
     title: "Commercial Mortgages 101 (CREFC)",
     description:
       "Straightforward overview of CMBS and commercial mortgage markets.",
-    href: "https://www.amazon.com/dp/0470521474?tag=hirecre-20",
+    href: "https://www.amazon.com/Commercial-Mortgages-101-Everything-Winning/dp/0814415075?tag=hirecre-20",
     affiliate: true,
   },
   {
     title: "The Handbook of Mortgage-Backed Securities",
     description: "Deep dive into MBS/CMBS structure, cashflows, and risk.",
-    href: "https://www.amazon.com/dp/0071594943?tag=hirecre-20",
+    href: "https://www.amazon.com/Handbook-Mortgage-Backed-Securities-Frank-Fabozzi/dp/0071460748?tag=hirecre-20",
     affiliate: true,
   },
   {
     title:
       "The 100 Most Important Things You Need to Know About the Real Estate Market",
     description: "Good macro + market intuition for interviews and investing.",
-    href: "https://www.amazon.com/dp/0071802791?tag=hirecre-20",
+    href: "https://www.amazon.com/Estate-Finance-Investments-William-Brueggeman/dp/007365809X?tag=hirecre-20",
     affiliate: true,
   },
 ];
@@ -91,14 +91,14 @@ const INVESTING_AND_PE: Resource[] = [
   {
     title: "Real Estate Finance & Investments (Brueggeman/Fisher) – Print",
     description: "The classic. Strong interview foundation and reference book.",
-    href: "https://www.amazon.com/dp/1260473720?tag=hirecre-20",
+    href: "https://www.amazon.com/dp/007365809X/?tag=hirecre-20",
     affiliate: true,
   },
   {
     title: "The Millionaire Real Estate Investor",
     description:
       "Practical framework for evaluating deals and building conviction.",
-    href: "https://www.amazon.com/dp/0071446375?tag=hirecre-20",
+    href: "https://www.amazon.com/dp/0071446375/?tag=hirecre-20",
     affiliate: true,
   },
   {
