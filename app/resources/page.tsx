@@ -63,8 +63,46 @@ const BOOKS: Resource[] = [
     href: "https://www.amazon.com/dp/1639051120?tag=hirecre-20",
     affiliate: true,
   },
+  const DEBT_AND_CREDIT: Resource[] = [
+  {
+    title: "Commercial Mortgages 101 (CREFC)",
+    description: "Straightforward overview of CMBS and commercial mortgage markets.",
+    href: "https://www.amazon.com/dp/0470521474?tag=hirecre-20",
+    affiliate: true,
+  },
+  {
+    title: "The Handbook of Mortgage-Backed Securities",
+    description: "Deep dive into MBS/CMBS structure, cashflows, and risk.",
+    href: "https://www.amazon.com/dp/0071594943?tag=hirecre-20",
+    affiliate: true,
+  },
+  {
+    title: "The 100 Most Important Things You Need to Know About the Real Estate Market",
+    description: "Good macro + market intuition for interviews and investing.",
+    href: "https://www.amazon.com/dp/0071802791?tag=hirecre-20",
+    affiliate: true,
+  },
 ];
-
+const INVESTING_AND_PE: Resource[] = [
+  {
+    title: "Real Estate Finance & Investments (Brueggeman/Fisher) – Print",
+    description: "The classic. Strong interview foundation and reference book.",
+    href: "https://www.amazon.com/dp/1260473720?tag=hirecre-20",
+    affiliate: true,
+  },
+  {
+    title: "The Millionaire Real Estate Investor",
+    description: "Practical framework for evaluating deals and building conviction.",
+    href: "https://www.amazon.com/dp/0071446375?tag=hirecre-20",
+    affiliate: true,
+  },
+  {
+    title: "The Intelligent Investor",
+    description: "Timeless investing principles; great for IRR/underwriting mindset.",
+    href: "https://www.amazon.com/dp/0060555661?tag=hirecre-20",
+    affiliate: true,
+  },
+];
 const MODELING: Resource[] = [
   {
     title: "Adventures in CRE (A.CRE)",
@@ -186,6 +224,8 @@ export default function ResourcesPage() {
 
        <Section title="📝 Interview & Career Prep" items={INTERVIEW} />
       <Section title="📚 Foundational Books" items={BOOKS} />
+      <Section title="💳 CRE Debt & Credit" items={DEBT_AND_CREDIT} />
+<Section title="🏢 Real Estate Investing & Private Equity" items={INVESTING_AND_PE} />
       <Section title="🧮 Modeling & Technical Training" items={MODELING} />
       <Section title="🎓 Certifications & Education" items={CERTIFICATIONS} />
       <Section title="📊 Research & Market Data" items={RESEARCH} />
@@ -193,7 +233,7 @@ export default function ResourcesPage() {
 
       <div className="mt-12 text-xs text-slate-500">
         Disclosure: Some links on this page are affiliate links. HireCRE may
-        earn a commission at no additional cost to you.
+        earn a commission at no additional cost to you. As an Amazon Associate, HireCRE earns from qualifying purchases. 
       </div>
     </main>
   );
