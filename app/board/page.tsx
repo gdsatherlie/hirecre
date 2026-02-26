@@ -408,7 +408,17 @@ export default function BoardPage() {
   useEffect(() => {
     setPage(1);
   }, [q, company, state, source, remoteOnly, payOnly]);
+  
+// Scroll to top when changing pages
+useEffect(() => {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+}, [page]);
 
+  useEffect(() => {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+}, [q, company, state, source, remoteOnly, payOnly]);
+
+  
   // ----- Fetch jobs -----
   useEffect(() => {
     (async () => {
