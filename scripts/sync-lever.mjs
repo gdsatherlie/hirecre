@@ -1,24 +1,14 @@
 #!/usr/bin/env node
 /**
- * scripts/sync-lever.mjs
- *
- * Reads scripts/lever_sources.txt
- *   - supports either:
- *       1) slug-or-url per line
- *       2) TSV: "Company Name<TAB>slug-or-url" per line
- *
- * Pulls jobs from Lever Postings API, filters out unwanted titles,
- * upserts into Supabase, marks stale jobs inactive per company,
- * AND enforces allowlist (deactivates companies removed from sources file).
+ * sync-lever.mjs
+ * - Reads scripts/lever_sources.txt (TSV: Pretty Company Name<TAB>lever-slug-or-url)
+ * - Pulls from Lever API
+ * - Upserts into public.jobs
+ * - Deactivates stale Lever jobs per company
  *
  * Required env:
- *   SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
- *
- * Optional env:
- *   LEVER_SOURCES_FILE (default: scripts/lever_sources.txt)
- *   JOBS_TABLE (default: jobs)
- *   COMPANIES_TABLE (default: companies)
+ *  SUPABASE_URL
+ *  SUPABASE_SERVICE_ROLE_KEY
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -33,53 +23,36 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-const LEVER_SOURCES_FILE =
-  process.env.LEVER_SOURCES_FILE || "scripts/lever_sources.txt";
-
-const JOBS_TABLE = process.env.JOBS_TABLE || "jobs";
-const COMPANIES_TABLE = process.env.COMPANIES_TABLE || "companies";
-
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-// Keep these aligned with your Greenhouse script filters (if you have them)
-const TITLE_BLOCKLIST = [
-  "intern",
-  "internship",
-  "temporary",
-  "contract-to-hire",
-];
-
-function normalizeLine(line) {
-  // supports:
-  // - "Company<TAB>slug-or-url"
-  // - "slug-or-url"
-  const parts = line.split("\t").map((s) => s.trim()).filter(Boolean);
-  if (parts.length === 1) {
-    const slug = extractSlug(parts[0]);
-    return { company_name: slug, slug };
-  }
-  const company_name = parts[0];
-  const slug = extractSlug(parts[1]);
-  return { company_name, slug };
-}
+const SOURCES_FILE = process.env.LEVER_SOURCES_FILE || "scripts/lever_sources.txt";
 
 function extractSlug(input) {
-  const s = input.trim();
+  const s = (input || "").trim();
   if (!s) return "";
-  // Accept jobs.lever.co/<slug>
-  // Or accept raw slug
-  const m = s.match(/jobs\.lever\.co\/([^/]+)\/?/i);
+  const m = s.match(/jobs\.lever\.co\/([^/]+)/i);
   return (m ? m[1] : s).trim();
 }
 
-function isBlockedTitle(title) {
-  const t = (title || "").toLowerCase();
-  return TITLE_BLOCKLIST.some((bad) => t.includes(bad));
+function parseSources(tsvText) {
+  return tsvText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((line) => {
+      const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
+      if (parts.length === 1) {
+        const slug = extractSlug(parts[0]);
+        return { company: slug, slug };
+      }
+      return { company: parts[0], slug: extractSlug(parts[1]) };
+    })
+    .filter((x) => x.slug);
 }
 
-async function fetchLeverPostings(slug) {
+async function fetchLever(slug) {
   const url = `https://api.lever.co/v0/postings/${encodeURIComponent(slug)}?mode=json`;
   const res = await fetch(url);
   if (!res.ok) {
@@ -89,196 +62,77 @@ async function fetchLeverPostings(slug) {
   return await res.json();
 }
 
-async function upsertCompany({ company_name, slug }) {
-  // Minimal company record. Adjust field names if your schema differs.
-  // Expected columns (recommended): name, source, source_slug, active
-  const row = {
-    name: company_name,
-    source: "lever",
-    source_slug: slug,
-    active: true,
-  };
+async function upsertJobsForCompany(companyPretty, slug) {
+  const postings = await fetchLever(slug);
 
-  const { data, error } = await supabase
-    .from(COMPANIES_TABLE)
-    .upsert(row, { onConflict: "source,source_slug" })
-    .select("id")
-    .single();
+  const seen = [];
 
-  if (error) throw error;
-  return data.id;
-}
+  // Build rows for bulk upsert
+  const rows = postings.map((p) => {
+    const source_job_id = String(p.id);
+    seen.push(source_job_id);
 
-async function upsertJobs(companyId, slug, postings) {
-  const seenExternalIds = new Set();
-
-  // Convert Lever postings to your internal job model
-  const rows = [];
-  for (const p of postings) {
-    const title = p.text || "";
-    if (isBlockedTitle(title)) continue;
-
-    const external_id = `lever:${slug}:${p.id}`;
-    seenExternalIds.add(external_id);
-
-    const location =
+    const location_city =
       p.categories?.location ||
       p.categories?.locations ||
       p.location ||
-      "";
+      null;
 
-    const department =
-      p.categories?.team ||
-      p.categories?.department ||
-      p.team ||
-      "";
-
-    rows.push({
-      company_id: companyId,
+    return {
       source: "lever",
-      external_id,
-      title,
-      location,
-      department,
-      url: p.hostedUrl || p.applyUrl || null,
-      posted_at: p.createdAt ? new Date(p.createdAt).toISOString() : null,
-      updated_at: p.updatedAt ? new Date(p.updatedAt).toISOString() : null,
+      source_job_id,
+      title: p.text || "",
+      company: companyPretty,       // ✅ pretty name ALWAYS
+      location_city: location_city ? String(location_city) : null,
       active: true,
-      // If you have a jsonb column for raw payload, uncomment and rename as needed:
-      // raw: p,
-    });
-  }
+    };
+  });
 
   if (rows.length) {
-    // Expected jobs unique constraint: (source, external_id) OR just external_id unique
     const { error } = await supabase
-      .from(JOBS_TABLE)
-      .upsert(rows, { onConflict: "source,external_id" });
+      .from("jobs")
+      .upsert(rows, { onConflict: "source,source_job_id" });
 
     if (error) throw error;
   }
 
-  return seenExternalIds;
-}
+  // Deactivate stale Lever jobs for this company
+  // (jobs that exist in DB for this company but were NOT in this run)
+  if (seen.length) {
+    const inList = `(${seen.map((id) => `"${id.replaceAll('"', '\\"')}"`).join(",")})`;
 
-async function deactivateStaleJobs(companyId, seenExternalIds) {
-  // Mark jobs inactive for this company/source that were NOT seen in this run.
-  // If your table is large, you can do this in batches, but this works fine for typical volumes.
-  const { data: existing, error: readErr } = await supabase
-    .from(JOBS_TABLE)
-    .select("id, external_id")
-    .eq("company_id", companyId)
-    .eq("source", "lever")
-    .eq("active", true);
+    const { error: staleErr } = await supabase
+      .from("jobs")
+      .update({ active: false })
+      .eq("source", "lever")
+      .eq("company", companyPretty)
+      .not("source_job_id", "in", inList);
 
-  if (readErr) throw readErr;
+    if (staleErr) throw staleErr;
+  }
 
-  const staleIds = (existing || [])
-    .filter((j) => !seenExternalIds.has(j.external_id))
-    .map((j) => j.id);
-
-  if (!staleIds.length) return 0;
-
-  const { error: updErr } = await supabase
-    .from(JOBS_TABLE)
-    .update({ active: false })
-    .in("id", staleIds);
-
-  if (updErr) throw updErr;
-  return staleIds.length;
-}
-
-async function enforceCompanyAllowlist(allowSlugsSet) {
-  // Deactivate lever companies removed from lever_sources.txt
-  const { data, error } = await supabase
-    .from(COMPANIES_TABLE)
-    .select("id, source_slug")
-    .eq("source", "lever")
-    .eq("active", true);
-
-  if (error) throw error;
-
-  const toDeactivate = (data || [])
-    .filter((c) => !allowSlugsSet.has(c.source_slug))
-    .map((c) => c.id);
-
-  if (!toDeactivate.length) return 0;
-
-  // Deactivate those companies
-  const { error: cErr } = await supabase
-    .from(COMPANIES_TABLE)
-    .update({ active: false })
-    .in("id", toDeactivate);
-
-  if (cErr) throw cErr;
-
-  // And deactivate their jobs too
-  const { error: jErr } = await supabase
-    .from(JOBS_TABLE)
-    .update({ active: false })
-    .in("company_id", toDeactivate)
-    .eq("source", "lever");
-
-  if (jErr) throw jErr;
-
-  return toDeactivate.length;
+  return { fetched: postings.length, kept: rows.length };
 }
 
 async function main() {
-  const abs = path.resolve(process.cwd(), LEVER_SOURCES_FILE);
+  const abs = path.resolve(process.cwd(), SOURCES_FILE);
   if (!fs.existsSync(abs)) {
     console.error(`Sources file not found: ${abs}`);
     process.exit(1);
   }
 
-  const lines = fs
-    .readFileSync(abs, "utf8")
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#"));
-
-  const sources = lines.map(normalizeLine).filter((x) => x.slug);
-
-  const allowSlugs = new Set(sources.map((s) => s.slug));
+  const sourcesText = fs.readFileSync(abs, "utf8");
+  const sources = parseSources(sourcesText);
 
   console.log(`Lever sources: ${sources.length}`);
 
-  let totalUpsertedCompanies = 0;
-  let totalSeenJobs = 0;
-  let totalStaleDeactivated = 0;
-
   for (const s of sources) {
-    console.log(`\n== ${s.company_name} (${s.slug}) ==`);
-
-    const companyId = await upsertCompany(s);
-    totalUpsertedCompanies += 1;
-
-    const postings = await fetchLeverPostings(s.slug);
-    const seen = await upsertJobs(companyId, s.slug, postings);
-
-    totalSeenJobs += seen.size;
-
-    const staleCount = await deactivateStaleJobs(companyId, seen);
-    totalStaleDeactivated += staleCount;
-
-    console.log(`Jobs seen this run: ${seen.size} | stale deactivated: ${staleCount}`);
+    console.log(`\n== ${s.company} (${s.slug}) ==`);
+    const result = await upsertJobsForCompany(s.company, s.slug);
+    console.log(`Fetched: ${result.fetched} | Upserted: ${result.kept}`);
   }
 
-  const allowlistDeactivated = await enforceCompanyAllowlist(allowSlugs);
-
   console.log("\nDone.");
-  console.log(
-    JSON.stringify(
-      {
-        companies_processed: totalUpsertedCompanies,
-        jobs_seen: totalSeenJobs,
-        stale_jobs_deactivated: totalStaleDeactivated,
-        companies_deactivated_by_allowlist: allowlistDeactivated,
-      },
-      null,
-      2
-    )
-  );
 }
 
 main().catch((err) => {
