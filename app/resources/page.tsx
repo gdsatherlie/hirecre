@@ -62,9 +62,7 @@ const BOOKS: Resource[] = [
     href: "https://www.amazon.com/dp/1639051120?tag=hirecre-20",
     affiliate: true,
   },
-];
 
-const DEBT_AND_CREDIT: Resource[] = [
   {
     title: "Commercial Mortgages 101 (CREFC)",
     description:
@@ -78,16 +76,9 @@ const DEBT_AND_CREDIT: Resource[] = [
     href: "https://www.amazon.com/Handbook-Mortgage-Backed-Securities-Frank-Fabozzi/dp/0071460748?tag=hirecre-20",
     affiliate: true,
   },
-  {
-    title:
-      "The 100 Most Important Things You Need to Know About the Real Estate Market",
-    description: "Good macro + market intuition for interviews and investing.",
-    href: "https://www.amazon.com/Estate-Finance-Investments-William-Brueggeman/dp/007365809X?tag=hirecre-20",
-    affiliate: true,
-  },
+
 ];
 
-const INVESTING_AND_PE: Resource[] = [
   {
     title: "Real Estate Finance & Investments (Brueggeman/Fisher) – Print",
     description: "The classic. Strong interview foundation and reference book.",
@@ -98,7 +89,7 @@ const INVESTING_AND_PE: Resource[] = [
     title: "The Millionaire Real Estate Investor",
     description:
       "Practical framework for evaluating deals and building conviction.",
-    href: "https://www.amazon.com/dp/0071446375/?tag=hirecre-20",
+    href: "https://www.amazon.com/Millionaire-Real-Estate-Investor/dp/0071446370?&linkCode=ll2&tag=hirecre-20&linkId=9de99bb46ea320d2a85e05d11fd6abf3&language=en_US&ref_=as_li_ss_tl",
     affiliate: true,
   },
   {
@@ -229,10 +220,7 @@ export default function ResourcesPage() {
 
       <Section title="📝 Interview & Career Prep" items={INTERVIEW} />
       <Section title="📚 Foundational Books" items={BOOKS} />
-      <Section title="💳 CRE Debt & Credit" items={DEBT_AND_CREDIT} />
-      <Section
-        title="🏢 Real Estate Investing & Private Equity"
-        items={INVESTING_AND_PE}
+
       />
       <Section title="🧮 Modeling & Technical Training" items={MODELING} />
       <Section title="🎓 Certifications & Education" items={CERTIFICATIONS} />
