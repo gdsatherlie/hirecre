@@ -1,0 +1,13 @@
+Banner Bank	bannerbank
+Bellwether	bellwetheram-2
+Bisnow	bisnow
+CIM	cimgroup
+Compstak	compstak
+Empire State Realty Trust	esrtreit
+Harrison Street Asset Management	harrisonst
+Marcus & Millichap	marcusmillichap
+Mission Capital	missioncap
+NAI Northern California	nainnorcal
+OakNorth	oaknorth.ai
+The Real Deal	therealdeal
+Ullico	ullico
