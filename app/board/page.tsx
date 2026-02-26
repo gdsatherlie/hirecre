@@ -1,15 +1,17 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import EmailSignup from "@/components/EmailSignup";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * Minimal change update:
- * - Adds click tracking for board job clicks (title link + "View job" button)
- * - Does NOT change existing logic, queries, filters, or UI structure
- * - Uses /api/track-click (you must add app/api/track-click/route.ts)
+ * Public board fix:
+ * - Removes login gating (no redirects)
+ * - Makes auth optional (enables Save Search only when logged in)
+ * - Shows a proper logged-out header (no "Sign out" when logged out)
+ * - Adds visible error output to detect Supabase RLS / permission issues
  */
 
 type Job = {
@@ -262,9 +264,8 @@ function extractPay(job: Job): string | null {
 }
 
 /**
- * NEW: Click tracking for "most-clicked jobs" (board-only).
- * This is best-effort and does NOT block navigation.
- * Requires: app/api/track-click/route.ts and Supabase click_events table + RLS insert policy.
+ * Click tracking (best effort).
+ * Requires: app/api/track-click/route.ts + click_events table + RLS insert policy.
  */
 function trackJobClick(jobId: string) {
   try {
@@ -274,14 +275,12 @@ function trackJobClick(jobId: string) {
       source: "board",
     });
 
-    // sendBeacon is ideal for "fire-and-forget" analytics
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
       const blob = new Blob([payload], { type: "application/json" });
       navigator.sendBeacon("/api/track-click", blob);
       return;
     }
 
-    // fallback
     fetch("/api/track-click", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -320,6 +319,7 @@ export default function BoardPage() {
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [count, setCount] = useState<number>(0);
+  const [fetchError, setFetchError] = useState<string>(""); // NEW: visible error
 
   const [lastSeen, setLastSeen] = useState<string | null>(null);
   const [seenReady, setSeenReady] = useState(false);
@@ -341,23 +341,22 @@ export default function BoardPage() {
   const PAGE_SIZE = 25;
   const [page, setPage] = useState<number>(1);
 
-  // ----- Auth gate -----
+  // ----- Optional auth (NO gate) -----
   useEffect(() => {
-  (async () => {
-    const { data } = await supabase.auth.getSession();
-    const email = data.session?.user?.email ?? null;
-    const uid = data.session?.user?.id ?? null;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const email = data.session?.user?.email ?? null;
+      const uid = data.session?.user?.id ?? null;
 
-    // No redirect. Board is public.
-    if (email && uid) {
-      setUserEmail(email);
-      setUserId(uid);
-    } else {
-      setUserEmail(null);
-      setUserId(null);
-    }
-  })();
-}, []);
+      if (email && uid) {
+        setUserEmail(email);
+        setUserId(uid);
+      } else {
+        setUserEmail(null);
+        setUserId(null);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     // Read last visit timestamp (if any)
@@ -414,6 +413,7 @@ export default function BoardPage() {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      setFetchError("");
 
       try {
         let query = supabase
@@ -436,18 +436,9 @@ export default function BoardPage() {
           );
         }
 
-        if (company !== "ALL") {
-          query = query.ilike("company", `%${company}%`);
-        }
-
-        // State filter uses location_state exact match
-        if (state !== "ALL") {
-          query = query.eq("location_state", state);
-        }
-
-        if (source !== "ALL") {
-          query = query.eq("source", source);
-        }
+        if (company !== "ALL") query = query.ilike("company", `%${company}%`);
+        if (state !== "ALL") query = query.eq("location_state", state);
+        if (source !== "ALL") query = query.eq("source", source);
 
         if (remoteOnly) {
           query = query.or(
@@ -459,26 +450,28 @@ export default function BoardPage() {
           );
         }
 
-        if (payOnly) {
-          query = query.eq("has_pay", true);
-        }
+        if (payOnly) query = query.eq("has_pay", true);
 
         const from = (page - 1) * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
         const { data, error, count: c } = await query.range(from, to);
-        if (error) throw error;
+
+        if (error) {
+          // IMPORTANT: show the real error (RLS issues show up here)
+          throw error;
+        }
 
         setJobs((data ?? []) as Job[]);
         setCount(c ?? 0);
 
-        // Update last seen timestamp for next visit (only after a successful fetch)
         try {
           localStorage.setItem("hirecre:lastSeenBoard", new Date().toISOString());
         } catch {}
-      } catch {
+      } catch (e: any) {
         setJobs([]);
         setCount(0);
+        setFetchError(e?.message ?? "Failed to load jobs (unknown error).");
       } finally {
         setLoading(false);
       }
@@ -489,7 +482,7 @@ export default function BoardPage() {
 
   async function saveThisSearch() {
     if (!userId || !userEmail) {
-      setSaveSearchMsg("You must be logged in to save searches.");
+      setSaveSearchMsg("Log in to save searches (optional). Browsing jobs is public.");
       return;
     }
 
@@ -497,7 +490,6 @@ export default function BoardPage() {
     setSaveSearchMsg("");
 
     try {
-      // Build a clean JSON object (only strings/booleans/null — ALWAYS valid JSON)
       const filters = {
         q: q.trim() || null,
         company: company !== "ALL" ? company : null,
@@ -507,7 +499,6 @@ export default function BoardPage() {
         pay_only: payOnly,
       };
 
-      // Default name suggestion
       const nameParts: string[] = [];
       if (filters.state) nameParts.push(filters.state);
       if (filters.company) nameParts.push(filters.company);
@@ -526,38 +517,33 @@ export default function BoardPage() {
         user_id: userId,
         user_email: userEmail,
         name: name.trim(),
-        filters, // jsonb
-        remote_only: remoteOnly, // boolean column you added
-        pay_only: payOnly, // boolean column you added
+        filters,
+        remote_only: remoteOnly,
+        pay_only: payOnly,
         is_enabled: true,
       };
 
       const { error } = await supabase.from("saved_searches").insert(payload);
       if (error) throw error;
 
-      // ✅ STEP 4: also add them to the MailerLite Alerts group (best-effort)
+      // best-effort: alerts hooks
       try {
         await fetch("/api/alerts/subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),
         });
-      } catch {
-        // ignore — saving search still succeeded
-      }
+      } catch {}
 
-      setSaveSearchMsg("Saved! Manage alerts at /alerts.");
-
-      // ALSO add this user to the MailerLite "HireCRE Job Alerts" group
       try {
         await fetch("/api/mailerlite/subscribe-alerts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail }),
         });
-      } catch {
-        // don't block saving the search if MailerLite is temporarily down
-      }
+      } catch {}
+
+      setSaveSearchMsg("Saved! Manage alerts at /alerts.");
     } catch (e: any) {
       setSaveSearchMsg(`Save failed: ${e?.message ?? "unknown error"}`);
     } finally {
@@ -567,7 +553,10 @@ export default function BoardPage() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    router.push("/login");
+    // stay on board; it's public
+    setUserEmail(null);
+    setUserId(null);
+    setSaveSearchMsg("Signed out.");
   }
 
   return (
@@ -580,15 +569,26 @@ export default function BoardPage() {
             </div>
 
             <h1 className="text-2xl font-semibold text-gray-900">Jobs</h1>
-            <div className="mt-1 text-sm text-gray-600">
-              Signed in as <span className="font-medium">{userEmail ?? "…"}</span>
-              <button
-                onClick={signOut}
-                className="ml-3 text-sm font-semibold text-blue-700 hover:underline"
-              >
-                Sign out
-              </button>
-            </div>
+
+            {userEmail ? (
+              <div className="mt-1 text-sm text-gray-600">
+                Signed in as <span className="font-medium">{userEmail}</span>
+                <button
+                  onClick={signOut}
+                  className="ml-3 text-sm font-semibold text-blue-700 hover:underline"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <div className="mt-1 text-sm text-gray-600">
+                Browsing publicly.{" "}
+                <Link href="/login" className="font-semibold text-blue-700 hover:underline">
+                  Log in
+                </Link>{" "}
+                to save searches & alerts.
+              </div>
+            )}
           </div>
 
           <div className="text-sm text-gray-600">
@@ -705,8 +705,19 @@ export default function BoardPage() {
           </div>
         </div>
 
-        {saveSearchMsg ? (
-          <div className="mt-3 text-sm text-gray-700">{saveSearchMsg}</div>
+        {saveSearchMsg ? <div className="mt-3 text-sm text-gray-700">{saveSearchMsg}</div> : null}
+
+        {/* NEW: show fetch error if present */}
+        {fetchError ? (
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <div className="font-semibold">Jobs failed to load</div>
+            <div className="mt-1">
+              {fetchError}
+              <div className="mt-2 text-xs text-red-700">
+                If this mentions permissions / RLS, you need an anon SELECT policy on the jobs table.
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {/* Results */}
@@ -747,10 +758,7 @@ export default function BoardPage() {
                 const sourceLabel = (job.source ?? "unknown").toLowerCase();
 
                 return (
-                  <div
-                    key={job.id}
-                    className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
-                  >
+                  <div key={job.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <div className="text-lg font-semibold text-gray-900">
@@ -770,9 +778,7 @@ export default function BoardPage() {
                         </div>
 
                         <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <div className="text-base font-semibold text-gray-900">
-                            {companyName || "—"}
-                          </div>
+                          <div className="text-base font-semibold text-gray-900">{companyName || "—"}</div>
                           <span className="text-gray-300">•</span>
                           <div className="text-sm text-gray-700">{location}</div>
                         </div>
@@ -784,9 +790,7 @@ export default function BoardPage() {
                           {pay ? <Pill>Pay: {pay}</Pill> : null}
                         </div>
 
-                        <div className="mt-3 text-xs text-gray-500">
-                          {posted ? `Posted ${posted}` : ""}
-                        </div>
+                        <div className="mt-3 text-xs text-gray-500">{posted ? `Posted ${posted}` : ""}</div>
                       </div>
 
                       <div className="flex shrink-0 items-center gap-2">
@@ -836,8 +840,8 @@ export default function BoardPage() {
         </div>
 
         <div className="mt-10 text-xs text-gray-500">
-          Tip: If the board ever shows “no jobs” unexpectedly, it’s usually auth/RLS. Log out and
-          log back in, or confirm your `jobs_read_authenticated` policy is still enabled.
+          If the board shows 0 jobs when logged out, it’s almost always Supabase RLS. Add an anon SELECT policy for
+          published/active jobs.
         </div>
       </div>
     </div>
