@@ -1,14 +1,19 @@
 #!/usr/bin/env node
 /**
- * sync-lever.mjs
- * - Reads scripts/lever_sources.txt (TSV: Pretty Company Name<TAB>lever-slug-or-url)
- * - Pulls from Lever API
- * - Upserts into public.jobs
- * - Deactivates stale Lever jobs per company
+ * scripts/sync-lever.mjs
  *
- * Required env:
- *  SUPABASE_URL
- *  SUPABASE_SERVICE_ROLE_KEY
+ * Reads scripts/lever_sources.txt (TSV):
+ *   Pretty Company Name<TAB>lever-slug-or-url
+ *
+ * Upserts into public.jobs (table: "jobs")
+ * Uses:
+ *   - source = 'lever'
+ *   - source_job_id = Lever job id
+ *   - company = pretty name (ALWAYS)
+ *   - source_company = lever slug (for debugging/grouping)
+ *   - fingerprint = lever:<slug>:<id>  (unique key)
+ *   - is_active = true/false
+ *   - last_seen_at = now()
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -36,18 +41,19 @@ function extractSlug(input) {
   return (m ? m[1] : s).trim();
 }
 
-function parseSources(tsvText) {
-  return tsvText
+function parseSources(text) {
+  return text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("#"))
     .map((line) => {
       const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
-      if (parts.length === 1) {
+      if (parts.length < 2) {
+        // allow single-column slug lines if needed
         const slug = extractSlug(parts[0]);
-        return { company: slug, slug };
+        return { companyPretty: slug, slug };
       }
-      return { company: parts[0], slug: extractSlug(parts[1]) };
+      return { companyPretty: parts[0], slug: extractSlug(parts[1]) };
     })
     .filter((x) => x.slug);
 }
@@ -57,61 +63,27 @@ async function fetchLever(slug) {
   const res = await fetch(url);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Lever fetch failed ${res.status} for ${slug}: ${body.slice(0, 120)}`);
+    throw new Error(`Lever fetch failed ${res.status} for ${slug}: ${body.slice(0, 160)}`);
   }
   return await res.json();
 }
 
-async function upsertJobsForCompany(companyPretty, slug) {
-  const postings = await fetchLever(slug);
+function pickLocationParts(posting) {
+  // Lever often returns "City, State" (or "Remote") in categories.location
+  const raw =
+    posting?.categories?.location ||
+    posting?.location ||
+    null;
 
-  const seen = [];
+  if (!raw || typeof raw !== "string") return { location_raw: null, location_city: null, location_state: null };
 
-  // Build rows for bulk upsert
-  const rows = postings.map((p) => {
-    const source_job_id = String(p.id);
-    seen.push(source_job_id);
-
-    const location_city =
-      p.categories?.location ||
-      p.categories?.locations ||
-      p.location ||
-      null;
-
-    return {
-      source: "lever",
-      source_job_id,
-      title: p.text || "",
-      company: companyPretty,       // ✅ pretty name ALWAYS
-      location_city: location_city ? String(location_city) : null,
-      active: true,
-    };
-  });
-
-  if (rows.length) {
-    const { error } = await supabase
-      .from("jobs")
-      .upsert(rows, { onConflict: "source,source_job_id" });
-
-    if (error) throw error;
+  const txt = raw.trim();
+  // naive split for "City, ST"
+  const parts = txt.split(",").map((p) => p.trim());
+  if (parts.length >= 2) {
+    return { location_raw: txt, location_city: parts[0] || null, location_state: parts[1] || null };
   }
-
-  // Deactivate stale Lever jobs for this company
-  // (jobs that exist in DB for this company but were NOT in this run)
-  if (seen.length) {
-    const inList = `(${seen.map((id) => `"${id.replaceAll('"', '\\"')}"`).join(",")})`;
-
-    const { error: staleErr } = await supabase
-      .from("jobs")
-      .update({ active: false })
-      .eq("source", "lever")
-      .eq("company", companyPretty)
-      .not("source_job_id", "in", inList);
-
-    if (staleErr) throw staleErr;
-  }
-
-  return { fetched: postings.length, kept: rows.length };
+  return { location_raw: txt, location_city: txt || null, location_state: null };
 }
 
 async function main() {
@@ -121,15 +93,76 @@ async function main() {
     process.exit(1);
   }
 
-  const sourcesText = fs.readFileSync(abs, "utf8");
-  const sources = parseSources(sourcesText);
-
+  const sources = parseSources(fs.readFileSync(abs, "utf8"));
   console.log(`Lever sources: ${sources.length}`);
 
-  for (const s of sources) {
-    console.log(`\n== ${s.company} (${s.slug}) ==`);
-    const result = await upsertJobsForCompany(s.company, s.slug);
-    console.log(`Fetched: ${result.fetched} | Upserted: ${result.kept}`);
+  for (const { companyPretty, slug } of sources) {
+    console.log(`\n== ${companyPretty} (${slug}) ==`);
+
+    const postings = await fetchLever(slug);
+    const seenFingerprints = [];
+
+    const nowIso = new Date().toISOString();
+
+    const rows = postings.map((p) => {
+      const source_job_id = String(p.id);
+      const fingerprint = `lever:${slug}:${source_job_id}`;
+      seenFingerprints.push(fingerprint);
+
+      const { location_raw, location_city, location_state } = pickLocationParts(p);
+
+      return {
+        source: "lever",
+        source_job_id,
+        fingerprint,
+
+        // ✅ pretty name always
+        company: companyPretty,
+
+        // useful for grouping/debugging
+        source_company: slug,
+
+        title: p.text || null,
+        url: p.hostedUrl || p.applyUrl || null,
+
+        location_raw,
+        location_city,
+        location_state,
+
+        // optional fields (safe to store if present)
+        job_type: p.categories?.commitment || null,
+        employment_type: p.categories?.commitment || null,
+
+        // IMPORTANT: your table uses is_active (not active)
+        is_active: true,
+        last_seen_at: nowIso,
+      };
+    });
+
+    if (rows.length) {
+      const { error } = await supabase
+        .from("jobs")
+        .upsert(rows, { onConflict: "fingerprint" }); // uses your fingerprint as the unique key
+
+      if (error) throw error;
+    }
+
+    // Deactivate stale Lever jobs for this company slug
+    // (anything previously seen for this slug not present in this run)
+    if (seenFingerprints.length) {
+      const inList = `(${seenFingerprints.map((f) => `"${f.replaceAll('"', '\\"')}"`).join(",")})`;
+
+      const { error: staleErr } = await supabase
+        .from("jobs")
+        .update({ is_active: false })
+        .eq("source", "lever")
+        .eq("source_company", slug)
+        .not("fingerprint", "in", inList);
+
+      if (staleErr) throw staleErr;
+    }
+
+    console.log(`Fetched: ${postings.length} | Upserted: ${rows.length}`);
   }
 
   console.log("\nDone.");
