@@ -11,6 +11,20 @@ type Resource = {
   affiliate?: boolean;
 };
 
+const INTERVIEW: Resource[] = [
+  {
+    title: "CRE Interview Prep Hub",
+    description:
+      "Role-based prep across debt, equity, acquisitions, asset management, development, leasing, and operations.",
+    href: "/interview-prep",
+  },
+  {
+    title: "Interview Prep Sitemap",
+    description:
+      "A complete index of every interview prep page (great for browsing and bookmarking).",
+
+  },
+
 const BOOKS: Resource[] = [
   {
     title: "The Real Estate Game",
@@ -130,19 +144,7 @@ const RESEARCH: Resource[] = [
   },
 ];
 
-const INTERVIEW: Resource[] = [
-  {
-    title: "CRE Interview Prep Hub",
-    description:
-      "Role-based prep across debt, equity, acquisitions, asset management, development, leasing, and operations.",
-    href: "/interview-prep",
-  },
-  {
-    title: "Interview Prep Sitemap",
-    description:
-      "A complete index of every interview prep page (great for browsing and bookmarking).",
-    href: "/interview-prep/sitemap",
-  },
+
 ];
 
 function Section({ title, items }: { title: string; items: Resource[] }) {
