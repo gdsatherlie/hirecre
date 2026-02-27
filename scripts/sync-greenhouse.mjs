@@ -19,6 +19,7 @@
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 import path from "node:path";
+import { extractPayFromText } from "./pay-utils.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -56,6 +57,11 @@ function shouldExcludeTitle(title) {
   return EXCLUDE_TITLE_KEYWORDS.some((kw) => t.includes(kw.toLowerCase()));
 }
 
+/**
+ * Keep fingerprint stable across runs/sources.
+ * Your existing scheme was `${source}::${source_job_id || url}`
+ * We'll keep that EXACTLY to avoid breaking existing upserts.
+ */
 function buildFingerprint({ source, source_job_id, url }) {
   return `${normalize(source)}::${normalize(source_job_id) || normalize(url)}`;
 }
@@ -69,7 +75,7 @@ function sourcesFilePath() {
 }
 
 /**
- * Accepts any of these line formats:
+ * Accepts any of these:
  *  - berkadia
  *  - https://boards.greenhouse.io/berkadia
  *  - https://job-boards.greenhouse.io/berkadia
@@ -102,35 +108,45 @@ function cleanGreenhouseSlug(input) {
 /**
  * Supports:
  *  - slug-or-url per line
- *  - TSV line: "Company Name<TAB>slug-or-url"
+ *  - TSV: "Company Name<TAB>slug-or-url"
  *
- * Returns array of objects:
+ * Returns:
  *  [{ slug: "berkadia", companyName: "Berkadia" }, ...]
  */
 function readSources() {
   const file = sourcesFilePath();
+  if (!fs.existsSync(file)) {
+    console.error(`Sources file missing: ${file}`);
+    process.exit(1);
+  }
+
   const txt = fs.readFileSync(file, "utf8");
 
   const rawLines = txt
-    .split("\n")
+    .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("#"));
 
-  const slugs = [];
+  const out = [];
   for (const line of rawLines) {
-    // If TSV: "Company Name<TAB>URL"
     const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
 
-    // Use URL column if present, otherwise treat line as slug/url
+    // TSV: Company Name<TAB>slug-or-url
+    const companyName = parts.length >= 2 ? parts[0] : null;
     const slugOrUrl = parts.length >= 2 ? parts[1] : parts[0];
 
     const slug = cleanGreenhouseSlug(slugOrUrl);
-    if (slug) slugs.push(slug);
+    if (!slug) continue;
+
+    out.push({
+      slug,
+      companyName: companyName || slug, // fallback pretty name
+    });
   }
 
-  // de-dupe while preserving order
+  // de-dupe by slug while preserving first-seen companyName
   const seen = new Set();
-  return slugs.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
+  return out.filter((x) => (seen.has(x.slug) ? false : (seen.add(x.slug), true)));
 }
 
 /* ===============================
@@ -164,6 +180,7 @@ async function upsertJobs(rows) {
 }
 
 async function markStaleInactive(companySlug, runIso) {
+  // Anything not touched in this run becomes inactive
   const { error } = await supabase
     .from("jobs")
     .update({ is_active: false })
@@ -178,12 +195,12 @@ async function markStaleInactive(companySlug, runIso) {
    ALLOWLIST ENFORCEMENT
 ================================= */
 
-async function enforceAllowlist(sources) {
-  if (!sources?.length) return;
+async function enforceAllowlist(allowedSlugs) {
+  if (!allowedSlugs?.length) return;
 
   const { error } = await supabase.rpc(
     "deactivate_removed_greenhouse_sources",
-    { allowed_sources: sources }
+    { allowed_sources: allowedSlugs }
   );
 
   if (error) throw error;
@@ -201,6 +218,8 @@ async function main() {
   console.log(`Loaded ${sources.length} Greenhouse sources.`);
 
   let totalUpserted = 0;
+  let totalKept = 0;
+  let totalExcluded = 0;
   let totalErrors = 0;
 
   for (const src of sources) {
@@ -209,30 +228,48 @@ async function main() {
 
     try {
       const jobs = await fetchGreenhouseJobs(companySlug);
-      const rows = [];
 
+      const rows = [];
       for (const j of jobs) {
         const title = normalize(j?.title);
         const jobUrl = normalize(j?.absolute_url);
         const sourceJobId = j?.id != null ? String(j.id) : null;
 
         if (!title || !jobUrl) continue;
-        if (shouldExcludeTitle(title)) continue;
+
+        totalKept += 1;
+
+        if (shouldExcludeTitle(title)) {
+          totalExcluded += 1;
+          continue;
+        }
+
+        const descriptionHtml = normalize(j?.content) || null;
+        const pay = extractPayFromText(descriptionHtml || "");
 
         rows.push({
           source: "greenhouse",
           source_job_id: sourceJobId,
           source_company: companySlug, // slug (sync key)
+
           title,
           company: companyName,        // ✅ human display name
           url: jobUrl,
-          description: normalize(j?.content) || null,
+
+          description: descriptionHtml,
+
+          // Pay fields (IDENTICAL logic across sources)
+          has_pay: pay.has_pay,
+          pay_extracted: pay.pay_extracted,
+
           posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
+
           fingerprint: buildFingerprint({
             source: "greenhouse",
             source_job_id: sourceJobId,
             url: jobUrl,
           }),
+
           is_active: true,
           last_seen_at: runIso,
         });
@@ -250,12 +287,14 @@ async function main() {
     }
   }
 
-  // 🔒 Enforce GitHub allowlist globally (slugs only)
+  // Enforce GitHub allowlist globally (slugs only)
   await enforceAllowlist(sources.map((s) => s.slug));
 
   console.log("---- Summary ----");
-  console.log(`Upserted: ${totalUpserted}`);
-  console.log(`Errors:   ${totalErrors}`);
+  console.log(`Processed (raw):   ${totalKept}`);
+  console.log(`Excluded titles:   ${totalExcluded}`);
+  console.log(`Upserted active:   ${totalUpserted}`);
+  console.log(`Errors:            ${totalErrors}`);
 }
 
 main().catch((err) => {
