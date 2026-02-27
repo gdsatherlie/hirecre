@@ -121,10 +121,22 @@ async function main() {
 
       const { location_raw, location_city, location_state } = pickLocationParts(p);
 
-      const descriptionHtml = p.description || "";
-      const descriptionText = p.descriptionPlain || stripHtml(descriptionHtml);
+const descriptionHtml = p.description || "";
+const descriptionText = p.descriptionPlain || stripHtml(descriptionHtml);
 
-      const pay = extractPayFromText(descriptionText);
+// DEBUG (temporary): print one company's descriptions to Coolify logs
+if ((companyPretty || "").toLowerCase().includes("harrison")) {
+  console.log("----- LEVER DEBUG START -----");
+  console.log("companyPretty:", companyPretty);
+  console.log("slug:", slug);
+  console.log("job id:", p.id);
+  console.log("title:", p.text);
+  console.log("descriptionPlain:", (p.descriptionPlain || "").slice(0, 1500));
+  console.log("descriptionHtml:", (descriptionHtml || "").slice(0, 1500));
+  console.log("----- LEVER DEBUG END -----");
+}
+
+const pay = extractPayFromText(descriptionText);
 
       return {
         source: "lever",
