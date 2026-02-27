@@ -8,23 +8,13 @@
  * Pulls Lever jobs via:
  *   https://api.lever.co/v0/postings/{slug}?mode=json
  *
- * Upserts into Supabase table: public.jobs (use .from("jobs"))
+ * Upserts into Supabase table: jobs
  *
- * Key behavior:
- * - company = pretty name ALWAYS (from TSV)
- * - source_company = lever slug (for grouping/debugging)
- * - fingerprint = lever:<slug>:<jobId> (unique key for upsert)
- * - is_active true for seen jobs, false for stale jobs per slug
- * - last_seen_at updated each run
- * - description stored
- * - has_pay + pay_extracted computed using shared pay parser (IDENTICAL across sources)
- *
- * Required env:
- *   SUPABASE_URL
- *   SUPABASE_SERVICE_ROLE_KEY
- *
- * Optional env:
- *   LEVER_SOURCES_FILE (default: scripts/lever_sources.txt)
+ * Uses your schema:
+ * - is_active (not active)
+ * - fingerprint (unique key)
+ * - source_company, last_seen_at
+ * - has_pay, pay_extracted
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -47,8 +37,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 const SOURCES_FILE =
   process.env.LEVER_SOURCES_FILE || "scripts/lever_sources.txt";
 
-/* ----------------------------- helpers ----------------------------- */
-
 function extractSlug(input) {
   const s = (input || "").trim();
   if (!s) return "";
@@ -63,9 +51,7 @@ function parseSources(text) {
     .filter((l) => l && !l.startsWith("#"))
     .map((line) => {
       const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        return { companyPretty: parts[0], slug: extractSlug(parts[1]) };
-      }
+      if (parts.length >= 2) return { companyPretty: parts[0], slug: extractSlug(parts[1]) };
       const slug = extractSlug(parts[0]);
       return { companyPretty: slug, slug };
     })
@@ -73,15 +59,11 @@ function parseSources(text) {
 }
 
 async function fetchLever(slug) {
-  const url = `https://api.lever.co/v0/postings/${encodeURIComponent(
-    slug
-  )}?mode=json`;
+  const url = `https://api.lever.co/v0/postings/${encodeURIComponent(slug)}?mode=json`;
   const res = await fetch(url);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(
-      `Lever fetch failed ${res.status} for ${slug}: ${body.slice(0, 160)}`
-    );
+    throw new Error(`Lever fetch failed ${res.status} for ${slug}: ${body.slice(0, 160)}`);
   }
   return await res.json();
 }
@@ -104,30 +86,16 @@ function stripHtml(html) {
 
 function pickLocationParts(posting) {
   const raw = posting?.categories?.location || posting?.location || null;
-
   if (!raw || typeof raw !== "string") {
     return { location_raw: null, location_city: null, location_state: null };
   }
-
   const txt = raw.trim();
   const parts = txt.split(",").map((p) => p.trim());
-
   if (parts.length >= 2) {
-    return {
-      location_raw: txt,
-      location_city: parts[0] || null,
-      location_state: parts[1] || null,
-    };
+    return { location_raw: txt, location_city: parts[0] || null, location_state: parts[1] || null };
   }
-
-  return {
-    location_raw: txt,
-    location_city: txt || null,
-    location_state: null,
-  };
+  return { location_raw: txt, location_city: txt || null, location_state: null };
 }
-
-/* ------------------------------ main ------------------------------ */
 
 async function main() {
   const abs = path.resolve(process.cwd(), SOURCES_FILE);
@@ -144,7 +112,6 @@ async function main() {
 
     const postings = await fetchLever(slug);
     const nowIso = new Date().toISOString();
-
     const seenFingerprints = [];
 
     const rows = postings.map((p) => {
@@ -152,14 +119,11 @@ async function main() {
       const fingerprint = `lever:${slug}:${source_job_id}`;
       seenFingerprints.push(fingerprint);
 
-      const { location_raw, location_city, location_state } =
-        pickLocationParts(p);
+      const { location_raw, location_city, location_state } = pickLocationParts(p);
 
-      // Lever: description is usually HTML; sometimes descriptionPlain exists
       const descriptionHtml = p.description || "";
       const descriptionText = p.descriptionPlain || stripHtml(descriptionHtml);
 
-      // ✅ IDENTICAL pay parsing across sources
       const pay = extractPayFromText(descriptionText);
 
       return {
@@ -167,7 +131,7 @@ async function main() {
         source_job_id,
         fingerprint,
 
-        company: companyPretty,
+        company: companyPretty,     // pretty name always
         source_company: slug,
 
         title: p.text || null,
@@ -190,18 +154,12 @@ async function main() {
     });
 
     if (rows.length) {
-      const { error } = await supabase
-        .from("jobs")
-        .upsert(rows, { onConflict: "fingerprint" });
-
+      const { error } = await supabase.from("jobs").upsert(rows, { onConflict: "fingerprint" });
       if (error) throw error;
     }
 
     if (seenFingerprints.length) {
-      const inList = `(${seenFingerprints
-        .map((f) => `"${f.replaceAll('"', '\\"')}"`)
-        .join(",")})`;
-
+      const inList = `(${seenFingerprints.map((f) => `"${f.replaceAll('"', '\\"')}"`).join(",")})`;
       const { error: staleErr } = await supabase
         .from("jobs")
         .update({ is_active: false })
