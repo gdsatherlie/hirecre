@@ -244,8 +244,9 @@ async function main() {
           continue;
         }
 
-        const descriptionHtml = normalize(j?.content) || null;
-        const pay = extractPayFromText(descriptionHtml || "");
+const descriptionHtml = normalize(j?.content) || null;
+const descriptionText = descriptionHtml ? descriptionHtml.replace(/<[^>]+>/g, " ") : "";
+const pay = extractPayFromText(descriptionText);
 
         rows.push({
           source: "greenhouse",
