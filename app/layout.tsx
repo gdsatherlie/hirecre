@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"] });
 
 const GA_ID = process.env.NEXT_PUBLIC_GTAG_ID;
 
+// ✅ AdSense publisher id from your screenshot
+const ADSENSE_CLIENT = "ca-pub-8663179222160693";
+
 export const metadata: Metadata = {
   title: "HireCRE — Commercial Real Estate Jobs",
   description:
@@ -21,6 +24,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        {/* ✅ AdSense verification / loader (required for site review) */}
+        <Script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+
+        {/* Google Analytics (optional, only if env var exists) */}
         {GA_ID ? (
           <>
             <Script
