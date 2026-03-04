@@ -23,7 +23,7 @@ type Job = {
   is_active: boolean | null;
 
   description: string | null; // may be html or text depending on source
-  description_text: string | null; // may ALSO be html depending on ingestion
+  description_text: string | null; // sometimes NOT plain text (can still contain html)
   has_pay: boolean | null;
   pay_extracted: string | null;
 };
@@ -36,63 +36,63 @@ function supaAdmin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-/**
- * Converts HTML-ish content into readable text.
- * - Adds newlines for common block elements before stripping tags
- * - Decodes basic entities
- * - Collapses whitespace
- */
-function htmlToText(input: string) {
-  let s = String(input || "");
-
-  // Normalize newlines around common block elements BEFORE stripping tags
-  s = s
-    .replace(/<\s*br\s*\/?>/gi, "\n")
-    .replace(/<\/\s*p\s*>/gi, "\n\n")
-    .replace(/<\/\s*div\s*>/gi, "\n\n")
-    .replace(/<\/\s*section\s*>/gi, "\n\n")
-    .replace(/<\/\s*h[1-6]\s*>/gi, "\n\n")
-    .replace(/<\/\s*li\s*>/gi, "\n")
-    .replace(/<\/\s*ul\s*>/gi, "\n\n")
-    .replace(/<\/\s*ol\s*>/gi, "\n\n");
-
-  // Remove scripts/styles
-  s = s.replace(/<script[\s\S]*?<\/script>/gi, " ");
-  s = s.replace(/<style[\s\S]*?<\/style>/gi, " ");
-
-  // Strip tags
-  s = s.replace(/<[^>]+>/g, " ");
-
-  // Decode common entities
-  s = s
+/** Minimal entity decode (enough for job descriptions) */
+function decodeEntities(s: string) {
+  return String(s || "")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-
-  // Cleanup whitespace
-  s = s
-    .replace(/\r/g, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-
-  return s;
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, "/");
 }
 
 /**
- * Some sources store HTML inside description_text.
- * This guarantees we always end up with clean text.
+ * Convert HTML-ish content into readable text while preserving structure:
+ * - headings become "Header:\n"
+ * - list items become "• item"
+ * - <br>/<p>/<div> become line breaks
  */
-function normalizeJobText(job: Job) {
-  const raw = (job.description_text || job.description || "").trim();
-  if (!raw) return "";
-  // If it *looks* like HTML, convert; if not, still run through converter (safe)
-  return htmlToText(raw);
+function htmlToReadableText(input: string) {
+  let html = decodeEntities(String(input || ""));
+
+  // strip script/style blocks
+  html = html.replace(/<script[\s\S]*?<\/script>/gi, " ");
+  html = html.replace(/<style[\s\S]*?<\/style>/gi, " ");
+
+  // normalize common block tags into newlines
+  html = html.replace(/<\/(p|div|section|article|header|footer|blockquote)>/gi, "\n\n");
+  html = html.replace(/<(p|div|section|article|header|footer|blockquote)[^>]*>/gi, "");
+
+  // headings -> newline + text + newline
+  html = html.replace(/<h[1-6][^>]*>/gi, "\n\n");
+  html = html.replace(/<\/h[1-6]>/gi, ":\n");
+
+  // line breaks
+  html = html.replace(/<br\s*\/?>/gi, "\n");
+
+  // list items -> bullet lines
+  html = html.replace(/<li[^>]*>/gi, "\n• ");
+  html = html.replace(/<\/li>/gi, "");
+  html = html.replace(/<\/?(ul|ol)[^>]*>/gi, "\n");
+
+  // links: keep anchor text, drop href
+  html = html.replace(/<a [^>]*>/gi, "");
+  html = html.replace(/<\/a>/gi, "");
+
+  // strong/em -> keep text only
+  html = html.replace(/<\/?(strong|b|em|i|u|span)[^>]*>/gi, "");
+
+  // remove any remaining tags
+  html = html.replace(/<[^>]+>/g, " ");
+
+  // cleanup whitespace
+  html = html.replace(/[ \t]+\n/g, "\n");
+  html = html.replace(/\n{3,}/g, "\n\n");
+  html = html.replace(/[ \t]{2,}/g, " ");
+  return html.trim();
 }
 
 function fmtDate(iso: string | null) {
@@ -110,14 +110,37 @@ function safePay(job: Job) {
   return p;
 }
 
-// “Don’t get flagged” index guard
-function shouldIndex(job: Job, descText: string) {
+function isHtmlish(s: string) {
+  const t = (s || "").trim();
+  if (!t) return false;
+  return /<\/?[a-z][\s\S]*>/i.test(t) || t.includes("&lt;") || t.includes("&gt;");
+}
+
+/** Always produce clean readable text, even if description_text contains HTML */
+function getNormalizedDescription(job: Job) {
+  const raw = (job.description_text || "").trim() || (job.description || "").trim();
+  if (!raw) return "";
+
+  // If it looks like HTML, convert it; if it's plain text, still decode entities + cleanup.
+  const text = isHtmlish(raw) ? htmlToReadableText(raw) : decodeEntities(raw).trim();
+
+  // final cleanup
+  return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+// “Don’t get flagged” index guard:
+// - Only index active jobs
+// - Must have title + company + apply URL
+// - Must have enough text to not be “thin content”
+function shouldIndex(job: Job) {
   if (!job.is_active) return false;
 
   const titleOk = (job.title || "").trim().length >= 5;
   const companyOk = (job.company || job.source_company || "").trim().length >= 2;
   const urlOk = !!(job.url && job.url.startsWith("http"));
-  const descOk = descText.trim().length >= 200; // avoid thin pages
+
+  const text = getNormalizedDescription(job);
+  const descOk = text.length >= 200;
 
   return titleOk && companyOk && urlOk && descOk;
 }
@@ -135,58 +158,40 @@ async function getJobBySlug(slug: string): Promise<Job | null> {
   return (data as Job) ?? null;
 }
 
-/**
- * Very lightweight formatter:
- * - Splits into blocks by blank lines
- * - If a block is mostly bullet-ish lines, render a <ul>
- * - If a block is a short line ending with ":" treat as heading
- */
-function renderNiceDescription(descText: string) {
-  const blocks = descText
-    .split(/\n{2,}/g)
-    .map((b) => b.trim())
-    .filter(Boolean);
+/** Render helper: paragraphs + bullets */
+function renderDescriptionBlocks(text: string) {
+  const blocks = text.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
 
-  return blocks.map((block, i) => {
-    const lines = block
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean);
+  return blocks.map((block, idx) => {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    const bulletLines = lines.filter((l) => l.startsWith("• "));
+    const nonBulletLines = lines.filter((l) => !l.startsWith("• "));
 
-    const isHeading =
-      lines.length === 1 &&
-      lines[0].length <= 60 &&
-      /[:：]$/.test(lines[0]) &&
-      !lines[0].includes("http");
+    const looksLikeList =
+      bulletLines.length >= 2 && bulletLines.length >= Math.max(1, Math.floor(lines.length / 2));
 
-    if (isHeading) {
-      const h = lines[0].replace(/[:：]$/, "");
+    if (looksLikeList) {
       return (
-        <h3 key={`h-${i}`} className="mt-6 text-lg font-semibold text-gray-900">
-          {h}
-        </h3>
-      );
-    }
-
-    // Bullet detection
-    const bulletLines = lines.filter((l) => /^[-*•]\s+/.test(l) || /^\d+\.\s+/.test(l));
-    const bulletish = bulletLines.length >= Math.max(3, Math.ceil(lines.length * 0.6));
-
-    if (bulletish) {
-      const items = lines.map((l) => l.replace(/^[-*•]\s+/, "").replace(/^\d+\.\s+/, "").trim());
-      return (
-        <ul key={`ul-${i}`} className="my-4 list-disc space-y-1 pl-5">
-          {items.map((it, idx) => (
-            <li key={`li-${i}-${idx}`}>{it}</li>
+        <ul key={idx} className="my-4 list-disc space-y-1 pl-6">
+          {bulletLines.map((l, i) => (
+            <li key={i}>{l.replace(/^•\s*/, "")}</li>
           ))}
         </ul>
       );
     }
 
-    // Default paragraph
+    // If it’s a “Heading:” line, make it stand out
+    if (lines.length === 1 && lines[0].endsWith(":") && lines[0].length <= 80) {
+      return (
+        <h3 key={idx} className="mt-6 text-base font-semibold text-gray-900">
+          {lines[0].replace(/:$/, "")}
+        </h3>
+      );
+    }
+
     return (
-      <p key={`p-${i}`} className="my-4">
-        {block}
+      <p key={idx} className="my-3 leading-relaxed">
+        {nonBulletLines.join(" ")}
       </p>
     );
   });
@@ -205,8 +210,7 @@ export async function generateMetadata(
   const company = (job.company || job.source_company || "Company").trim();
   const title = (job.title || "Job").trim();
 
-  const descText = normalizeJobText(job);
-  const indexable = shouldIndex(job, descText);
+  const indexable = shouldIndex(job);
 
   return {
     title: `${title} at ${company} | HireCRE`,
@@ -239,10 +243,10 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
     job.location_raw ||
     "";
 
-  const descText = normalizeJobText(job);
-  const indexable = shouldIndex(job, descText);
+  const descText = getNormalizedDescription(job);
+  const indexable = shouldIndex(job);
 
-  const jsonLd = {
+  const jsonLd: Record<string, any> = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
     title,
@@ -258,7 +262,7 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
           },
         }
       : undefined,
-    description: descText.slice(0, 5000),
+    description: descText ? descText.slice(0, 5000) : undefined,
     url: job.url || undefined,
     directApply: true,
   };
@@ -267,8 +271,7 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
       {!indexable ? (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          This listing is visible to users, but it’s not eligible for search indexing (missing details or too little
-          description).
+          This listing is visible to users, but it’s not eligible for search indexing (missing details or too little description).
         </div>
       ) : null}
 
@@ -312,14 +315,16 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
         </a>
       </div>
 
-      <section className="mt-8 space-y-3">
+      <section className="mt-8">
         <h2 className="text-xl font-semibold text-gray-900">Job description</h2>
 
         <div className="prose prose-neutral max-w-none">
           {descText ? (
-            renderNiceDescription(descText)
+            <div className="mt-3">{renderDescriptionBlocks(descText)}</div>
           ) : (
-            <p>This job did not include a description. Please check the employer’s posting for full details.</p>
+            <p className="mt-3">
+              This job did not include a description. Please check the employer’s posting for full details.
+            </p>
           )}
         </div>
       </section>
