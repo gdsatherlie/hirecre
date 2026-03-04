@@ -23,18 +23,23 @@ type Job = {
   is_active: boolean | null;
 
   description: string | null; // may be html or text depending on source
-  description_text: string | null; // recommended normalized plain text
+  description_text: string | null; // normalized plain text (recommended)
   has_pay: boolean | null;
   pay_extracted: string | null;
 };
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://hirecre.com";
 
-function supaAdmin() {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// ✅ Safe server-side Supabase client (ANON only)
+// Requires RLS policy that allows SELECT for active jobs.
+function supaPublic() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createClient(url, key, { auth: { persistSession: false } });
 }
+
+// Optional: keep pages reasonably fresh without hammering DB
+export const revalidate = 3600; // 1 hour
 
 function stripHtml(html: string) {
   return String(html || "")
@@ -58,33 +63,36 @@ function fmtDate(iso: string | null) {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+// Keep pay conservative so we don’t show garbage parses
 function safePay(job: Job) {
-  const p = (job.pay_extracted || "").trim();
   if (!job.has_pay) return null;
+  const p = (job.pay_extracted || "").trim();
   if (!p) return null;
   if (p.length < 3 || p.length > 80) return null;
   return p;
 }
 
-// “Don’t get flagged” index guard:
-// - Only index active jobs
-// - Must have title + company + apply URL
-// - Must have enough text to not be “thin content”
+/**
+ * “Don’t get flagged” indexing guard:
+ * Only index pages that look like real job pages.
+ */
 function shouldIndex(job: Job) {
   if (!job.is_active) return false;
 
   const titleOk = (job.title || "").trim().length >= 5;
   const companyOk = (job.company || job.source_company || "").trim().length >= 2;
-  const urlOk = !!(job.url && job.url.startsWith("http"));
+  const urlOk = !!(job.url && /^https?:\/\//i.test(job.url));
 
   const text = (job.description_text || stripHtml(job.description || "") || "").trim();
-  const descOk = text.length >= 200; // avoid thin pages
+
+  // Avoid thin/duplicate pages: require some substance
+  const descOk = text.length >= 250;
 
   return titleOk && companyOk && urlOk && descOk;
 }
 
 async function getJobBySlug(slug: string): Promise<Job | null> {
-  const { data, error } = await supaAdmin()
+  const { data, error } = await supaPublic()
     .from("jobs")
     .select(
       "slug,source,source_company,source_job_id,title,company,location_city,location_state,location_raw,url,posted_at,last_seen_at,is_active,description,description_text,has_pay,pay_extracted"
@@ -97,23 +105,26 @@ async function getJobBySlug(slug: string): Promise<Job | null> {
 }
 
 export async function generateMetadata(
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: { slug: string } }
 ): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug } = params;
   const job = await getJobBySlug(slug);
 
+  // Not found or inactive -> noindex
   if (!job || !job.is_active) {
-    return { title: "Job not found | HireCRE", robots: { index: false, follow: false } };
+    return {
+      title: "Job not found | HireCRE",
+      robots: { index: false, follow: false },
+    };
   }
 
   const company = (job.company || job.source_company || "Company").trim();
   const title = (job.title || "Job").trim();
-
   const indexable = shouldIndex(job);
 
   return {
     title: `${title} at ${company} | HireCRE`,
-    description: `Apply for ${title} at ${company}. HireCRE aggregates commercial real estate jobs and links to the employer’s official posting.`,
+    description: `Apply for ${title} at ${company}. HireCRE links to the employer’s official posting.`,
     alternates: { canonical: `${SITE_URL}/jobs/${job.slug}` },
     robots: indexable ? { index: true, follow: true } : { index: false, follow: true },
     openGraph: {
@@ -125,8 +136,8 @@ export async function generateMetadata(
   };
 }
 
-export default async function JobPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function JobPage({ params }: { params: { slug: string } }) {
+  const { slug } = params;
   const job = await getJobBySlug(slug);
 
   if (!job || !job.is_active) return notFound();
@@ -143,29 +154,36 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
     "";
 
   const descText = (job.description_text || stripHtml(job.description || "") || "").trim();
-
   const indexable = shouldIndex(job);
 
-  const jsonLd = {
+  // ✅ Aggregator = NOT direct apply
+  const jsonLd: any = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
     title,
     hiringOrganization: { "@type": "Organization", name: company },
     datePosted: job.posted_at ? new Date(job.posted_at).toISOString() : undefined,
-    jobLocation: location
-      ? {
-          "@type": "Place",
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: job.location_city || undefined,
-            addressRegion: job.location_state || undefined,
-          },
-        }
-      : undefined,
-    description: descText.slice(0, 5000),
-    url: job.url || undefined,
-    directApply: true,
+    description: descText ? descText.slice(0, 5000) : undefined,
+    url: job.url || `${SITE_URL}/jobs/${job.slug}`,
+    directApply: false,
   };
+
+  if (location) {
+    jsonLd.jobLocation = {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: job.location_city || undefined,
+        addressRegion: job.location_state || undefined,
+        addressCountry: "US",
+      },
+    };
+  }
+
+  // Optional pay schema (only if confident)
+  if (pay && /\$/.test(pay)) {
+    // leave as text in UI; do not force schema unless you normalize into min/max + unit
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
@@ -218,9 +236,11 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
       <section className="mt-8 space-y-3">
         <h2 className="text-xl font-semibold text-gray-900">Job description</h2>
         <div className="prose prose-neutral max-w-none">
-          {descText
-            ? descText.split("\n").map((line, idx) => (line.trim() ? <p key={idx}>{line}</p> : null))
-            : <p>This job did not include a description. Please check the employer’s posting for full details.</p>}
+          {descText ? (
+            descText.split("\n").map((line, idx) => (line.trim() ? <p key={idx}>{line}</p> : null))
+          ) : (
+            <p>This job did not include a description. Please check the employer’s posting for full details.</p>
+          )}
         </div>
       </section>
 
