@@ -2,22 +2,24 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import EmailSignup from "@/components/EmailSignup";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * Public board fix:
- * - Removes login gating (no redirects)
- * - Makes auth optional (enables Save Search only when logged in)
- * - Shows a proper logged-out header (no "Sign out" when logged out)
- * - Adds visible error output to detect Supabase RLS / permission issues
+ * Public board:
+ * - No login gating
+ * - Auth optional (Save Search only when logged in)
+ * - Shows errors for RLS / permission issues
+ *
+ * IMPORTANT UPDATE:
+ * - Job title + "View details" now link to internal SEO pages: /jobs/[slug]
+ * - "Apply" button links to employer posting (external)
  */
 
 type Job = {
   id: string;
 
-  // NEW: for SEO pages
+  // SEO page slug
   slug?: string | null;
 
   // core
@@ -137,16 +139,11 @@ function unslugCompany(input: string): string {
   let s = (input || "").trim();
   if (!s) return s;
 
-  // already readable (has spaces)
   if (/\s/.test(s)) return s;
 
-  // separators -> spaces
   s = s.replace(/[-_]+/g, " ");
-
-  // split common suffixes at end
   s = s.replace(/(.*?)(llc|inc|ltd|lp|llp|reit|plc)$/i, "$1 $2").trim();
 
-  // dictionary split if still one token
   if (!/\s/.test(s)) {
     const words = [
       "national",
@@ -190,13 +187,11 @@ function titleCaseCompany(input: string): string {
   const trimmed = (input || "").trim();
   if (!trimmed) return trimmed;
 
-  // overrides first (key strips spaces)
   const overrideKey = trimmed.toLowerCase().replace(/\s+/g, "");
   if (COMPANY_OVERRIDES[overrideKey]) return COMPANY_OVERRIDES[overrideKey];
 
   const cleaned = unslugCompany(trimmed);
 
-  // if already mixed case, keep it (after unslug)
   const hasUpper = /[A-Z]/.test(cleaned);
   const hasLower = /[a-z]/.test(cleaned);
   if (hasUpper && hasLower) return cleaned;
@@ -268,7 +263,6 @@ function extractPay(job: Job): string | null {
 
 /**
  * Click tracking (best effort).
- * Requires: app/api/track-click/route.ts + click_events table + RLS insert policy.
  */
 function trackJobClick(jobId: string) {
   try {
@@ -311,8 +305,6 @@ function Pill({
 }
 
 export default function BoardPage() {
-  const router = useRouter();
-
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -322,7 +314,7 @@ export default function BoardPage() {
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [count, setCount] = useState<number>(0);
-  const [fetchError, setFetchError] = useState<string>(""); // NEW: visible error
+  const [fetchError, setFetchError] = useState<string>("");
 
   const [lastSeen, setLastSeen] = useState<string | null>(null);
   const [seenReady, setSeenReady] = useState(false);
@@ -362,7 +354,6 @@ export default function BoardPage() {
   }, []);
 
   useEffect(() => {
-    // Read last visit timestamp (if any)
     try {
       const v = localStorage.getItem("hirecre:lastSeenBoard");
       setLastSeen(v);
@@ -412,14 +403,10 @@ export default function BoardPage() {
     setPage(1);
   }, [q, company, state, source, remoteOnly, payOnly]);
 
-  // Scroll to top when changing pages
+  // Scroll to top when changing pages/filters
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [page]);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [q, company, state, source, remoteOnly, payOnly]);
+  }, [page, q, company, state, source, remoteOnly, payOnly]);
 
   // ----- Fetch jobs -----
   useEffect(() => {
@@ -428,9 +415,31 @@ export default function BoardPage() {
       setFetchError("");
 
       try {
+        // Explicit select so we ALWAYS fetch slug (and avoid carrying huge columns unnecessarily)
         let query = supabase
           .from("jobs")
-          .select("*", { count: "exact" })
+          .select(
+            [
+              "id",
+              "slug",
+              "source",
+              "title",
+              "company",
+              "location_city",
+              "location_state",
+              "location_raw",
+              "url",
+              "posted_at",
+              "description",
+              "has_pay",
+              "pay_extracted",
+              "pay",
+              "pay_text",
+              "salary",
+              "compensation",
+            ].join(","),
+            { count: "exact" }
+          )
           .eq("is_active", true)
           .order("posted_at", { ascending: false });
 
@@ -535,7 +544,6 @@ export default function BoardPage() {
       const { error } = await supabase.from("saved_searches").insert(payload);
       if (error) throw error;
 
-      // best-effort: alerts hooks
       try {
         await fetch("/api/alerts/subscribe", {
           method: "POST",
@@ -722,7 +730,6 @@ export default function BoardPage() {
 
         {saveSearchMsg ? <div className="mt-3 text-sm text-gray-700">{saveSearchMsg}</div> : null}
 
-        {/* show fetch error if present */}
         {fetchError ? (
           <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <div className="font-semibold">Jobs failed to load</div>
@@ -817,24 +824,47 @@ export default function BoardPage() {
                         </div>
 
                         <div className="mt-3 text-xs text-gray-500">{posted ? `Posted ${posted}` : ""}</div>
+
+                        {/* Helpful hint if slug is missing */}
+                        {!internalHref ? (
+                          <div className="mt-2 text-xs text-amber-700">
+                            Missing slug for this job — linking directly to employer.
+                          </div>
+                        ) : null}
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {/* Primary: internal details page (SEO page) */}
                         {internalHref ? (
                           <Link
                             href={internalHref}
                             className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                             onClick={() => trackJobClick(job.id)}
                           >
-                            View job
+                            View details
                           </Link>
-                        ) : externalHref ? (
+                        ) : null}
+
+                        {/* Secondary: external apply link */}
+                        {externalHref ? (
+                          <a
+                            href={externalHref}
+                            target="_blank"
+                            rel="nofollow noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                            onClick={() => trackJobClick(job.id)}
+                          >
+                            Apply
+                          </a>
+                        ) : null}
+
+                        {/* If no internal link, keep a single external button (old behavior) */}
+                        {!internalHref && externalHref ? (
                           <a
                             href={externalHref}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                            onClick={() => trackJobClick(job.id)}
+                            className="hidden"
                           >
                             View job
                           </a>
