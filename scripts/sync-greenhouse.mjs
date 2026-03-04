@@ -60,10 +60,26 @@ function shouldExcludeTitle(title) {
 /**
  * Keep fingerprint stable across runs/sources.
  * Your existing scheme was `${source}::${source_job_id || url}`
- * We'll keep that EXACTLY to avoid breaking existing upserts.
+ * We keep it EXACTLY.
  */
 function buildFingerprint({ source, source_job_id, url }) {
   return `${normalize(source)}::${normalize(source_job_id) || normalize(url)}`;
+}
+
+function stripHtml(html) {
+  if (!html) return "";
+  return String(html)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /* ===============================
@@ -154,7 +170,9 @@ function readSources() {
 ================================= */
 
 async function fetchGreenhouseJobs(companySlug) {
-  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(companySlug)}/jobs?content=true`;
+  const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(
+    companySlug
+  )}/jobs?content=true`;
 
   const res = await fetch(url, {
     headers: { "user-agent": "hirecre/greenhouse-sync" },
@@ -172,9 +190,11 @@ async function fetchGreenhouseJobs(companySlug) {
 async function upsertJobs(rows) {
   if (!rows.length) return;
 
+  // ✅ IMPORTANT: conflict on (source, source_job_id)
+  // This aligns with the unique index you’re trying to create.
   const { error } = await supabase
     .from("jobs")
-    .upsert(rows, { onConflict: "fingerprint" });
+    .upsert(rows, { onConflict: "source,source_job_id" });
 
   if (error) throw error;
 }
@@ -198,10 +218,9 @@ async function markStaleInactive(companySlug, runIso) {
 async function enforceAllowlist(allowedSlugs) {
   if (!allowedSlugs?.length) return;
 
-  const { error } = await supabase.rpc(
-    "deactivate_removed_greenhouse_sources",
-    { allowed_sources: allowedSlugs }
-  );
+  const { error } = await supabase.rpc("deactivate_removed_greenhouse_sources", {
+    allowed_sources: allowedSlugs,
+  });
 
   if (error) throw error;
   console.log("Allowlist enforcement complete.");
@@ -220,6 +239,7 @@ async function main() {
   let totalUpserted = 0;
   let totalKept = 0;
   let totalExcluded = 0;
+  let totalSkippedNoId = 0;
   let totalErrors = 0;
 
   for (const src of sources) {
@@ -239,30 +259,37 @@ async function main() {
 
         totalKept += 1;
 
+        if (!sourceJobId) {
+          // ✅ With unique index on (source, source_job_id), we must have an ID.
+          totalSkippedNoId += 1;
+          continue;
+        }
+
         if (shouldExcludeTitle(title)) {
           totalExcluded += 1;
           continue;
         }
 
-const descriptionHtml = normalize(j?.content) || null;
-const descriptionText = descriptionHtml ? descriptionHtml.replace(/<[^>]+>/g, " ") : "";
-const pay = extractPayFromText(descriptionText);
+        const descriptionHtml = normalize(j?.content) || null;
+        const descriptionText = descriptionHtml ? stripHtml(descriptionHtml) : "";
+        const pay = extractPayFromText(descriptionText);
 
         rows.push({
           source: "greenhouse",
           source_job_id: sourceJobId,
-          source_company: companySlug, // slug (sync key)
+          source_company: companySlug, // greenhouse board slug (sync key)
 
           title,
-          company: companyName,        // ✅ human display name
+          company: companyName, // human display name
           url: jobUrl,
 
           description: descriptionHtml,
 
-          // Pay fields (IDENTICAL logic across sources)
+          // Pay fields
           has_pay: pay.has_pay,
           pay_extracted: pay.pay_extracted,
 
+          // Greenhouse API doesn’t always provide a clean "posted" date; updated_at is OK as a proxy.
           posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
 
           fingerprint: buildFingerprint({
@@ -284,7 +311,7 @@ const pay = extractPayFromText(descriptionText);
       console.log(`[DONE] ${companySlug}: ${rows.length} active jobs.`);
     } catch (e) {
       totalErrors += 1;
-      console.log(`[ERR] ${companySlug}: ${e.message}`);
+      console.log(`[ERR] ${companySlug}: ${e?.message || e}`);
     }
   }
 
@@ -292,10 +319,11 @@ const pay = extractPayFromText(descriptionText);
   await enforceAllowlist(sources.map((s) => s.slug));
 
   console.log("---- Summary ----");
-  console.log(`Processed (raw):   ${totalKept}`);
-  console.log(`Excluded titles:   ${totalExcluded}`);
-  console.log(`Upserted active:   ${totalUpserted}`);
-  console.log(`Errors:            ${totalErrors}`);
+  console.log(`Processed (raw):       ${totalKept}`);
+  console.log(`Skipped missing id:    ${totalSkippedNoId}`);
+  console.log(`Excluded titles:       ${totalExcluded}`);
+  console.log(`Upserted active:       ${totalUpserted}`);
+  console.log(`Errors:                ${totalErrors}`);
 }
 
 main().catch((err) => {
