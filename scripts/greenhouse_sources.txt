@@ -1,42 +1,42 @@
-615ventures
-onarchipelago
-ascentds
-assetliving
-berkadia
-biomedrealty
-centennial
-concordsummit
-cre360
-crexi
-davisdevelopment
-divcowest
-dlpcapital
-faropoint
-gcmgrosvenor
-hpsinvestmentpartners
-iconiq
-krollbondratingagency
-lpc
-lineagefinance
-loancore
-metropolitancommercialbank
-newcastleinvestors
-northmarq
-northspyre
-olympusproperty
-piermontbank
-prometheusrealestategroup
-rclco
-realtymogul
-redstoneresidential
-resideliving
-rexfordindustrial
-rxr
-ryanstuartdev
-sandsinvestmentgroup
-soundpointcapital
-sunrise
-thedurstorganization
-thesciongroupllc
-tpgcareers
-vts
+615 Ventures	615ventures
+On Archipelago	onarchipelago
+Ascent Development	ascentds
+Asset Living	assetliving
+Berkadia	berkadia
+BioMed Realty	biomedrealty
+Centennial	centennial
+Concord Summit Capital	concordsummit
+CRE360	cre360
+Crexi	crexi
+Davis Development	davisdevelopment
+DivcoWest	divcowest
+DLP Capital	dlpcapital
+Faropoint	faropoint
+GCM Grosvenor	gcmgrosvenor
+HPS Investment Partners	hpsinvestmentpartners
+ICONIQ Capital	iconiq
+Kroll Bond Rating Agency	krollbondratingagency
+Lincoln Property Companies	lpc
+Lineage Finance	lineagefinance
+LoanCore	loancore
+Metropolitan Commercial Bank	metropolitancommercialbank
+NewCastle Investors	newcastleinvestors
+Northmarq	northmarq
+Northspyre	northspyre
+Olympus Property	olympusproperty
+Piermont Bank	piermontbank
+Prometheus Real Estate Group	prometheusrealestategroup
+RCLCO	rclco
+RealtyMogul	realtymogul
+Redstone Residential	redstoneresidential
+Reside Living	resideliving
+Rexford Industrial	rexfordindustrial
+RXR	rxr
+Ryan Stuart Development	ryanstuartdev
+Sands Investment Group	sandsinvestmentgroup
+Sound Point Capital	soundpointcapital
+Sunrise	sunrise
+The Durst Organization	thedurstorganization
+The Scion Group	thesciongroupllc
+TPG	tpgcareers
+VTS	vts
