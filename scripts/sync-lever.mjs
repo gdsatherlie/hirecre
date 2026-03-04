@@ -12,10 +12,14 @@
  *
  * Uses your schema:
  * - is_active
- * - fingerprint (unique key)
+ * - fingerprint (kept, but NOT used as conflict key anymore)
  * - source_company, last_seen_at
  * - has_pay, pay_extracted
- * - posted_at  ✅ NEW
+ * - posted_at ✅
+ *
+ * IMPORTANT:
+ * Your DB now enforces UNIQUE(source, source_job_id)
+ * so we upsert onConflict: "source,source_job_id"
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -35,8 +39,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-const SOURCES_FILE =
-  process.env.LEVER_SOURCES_FILE || "scripts/lever_sources.txt";
+const SOURCES_FILE = process.env.LEVER_SOURCES_FILE || "scripts/lever_sources.txt";
 
 function extractSlug(input) {
   const s = (input || "").trim();
@@ -107,6 +110,30 @@ function leverPostedAt(p) {
   return d.toISOString();
 }
 
+async function upsertJobs(rows) {
+  if (!rows.length) return;
+
+  // ✅ IMPORTANT: conflict on (source, source_job_id)
+  const { error } = await supabase
+    .from("jobs")
+    .upsert(rows, { onConflict: "source,source_job_id" });
+
+  if (error) throw error;
+}
+
+async function markStaleInactive(sourceCompanySlug, runIso) {
+  // ✅ Anything not touched in this run becomes inactive.
+  // This is faster/cleaner than building a giant IN(...) list.
+  const { error } = await supabase
+    .from("jobs")
+    .update({ is_active: false })
+    .eq("source", "lever")
+    .eq("source_company", sourceCompanySlug)
+    .lt("last_seen_at", runIso);
+
+  if (error) throw error;
+}
+
 async function main() {
   const abs = path.resolve(process.cwd(), SOURCES_FILE);
   if (!fs.existsSync(abs)) {
@@ -116,19 +143,25 @@ async function main() {
 
   const sources = parseSources(fs.readFileSync(abs, "utf8"));
   console.log(`Lever sources: ${sources.length}`);
-  console.log(`SYNC-LEVER VERSION: posted_at enabled ✅`);
+  console.log(`SYNC-LEVER VERSION: conflict key = (source, source_job_id) ✅`);
 
   for (const { companyPretty, slug } of sources) {
     console.log(`\n== ${companyPretty} (${slug}) ==`);
 
     const postings = await fetchLever(slug);
-    const nowIso = new Date().toISOString();
-    const seenFingerprints = [];
+    const runIso = new Date().toISOString();
 
-    const rows = postings.map((p) => {
+    let skippedMissingId = 0;
+
+    const rows = [];
+    for (const p of postings) {
+      if (!p?.id) {
+        skippedMissingId += 1;
+        continue;
+      }
+
       const source_job_id = String(p.id);
       const fingerprint = `lever:${slug}:${source_job_id}`;
-      seenFingerprints.push(fingerprint);
 
       const { location_raw, location_city, location_state } = pickLocationParts(p);
 
@@ -137,7 +170,7 @@ async function main() {
 
       const pay = extractPayFromText(descriptionText);
 
-      return {
+      rows.push({
         source: "lever",
         source_job_id,
         fingerprint,
@@ -152,7 +185,6 @@ async function main() {
         location_city,
         location_state,
 
-        // ✅ NEW FIELD
         posted_at: leverPostedAt(p),
 
         description: descriptionHtml || descriptionText || null,
@@ -160,14 +192,14 @@ async function main() {
         pay_extracted: pay.pay_extracted,
 
         is_active: true,
-        last_seen_at: nowIso,
+        last_seen_at: runIso,
 
         job_type: p.categories?.commitment || null,
         employment_type: p.categories?.commitment || null,
-      };
-    });
+      });
+    }
 
-    // 🔥 HARD DEBUG so you can SEE if production is running this code
+    // 🔥 DEBUG so you can SEE production is running this code
     const sample = rows.slice(0, 3).map((r, i) => ({
       i,
       title: r.title,
@@ -177,27 +209,14 @@ async function main() {
     const withPosted = rows.filter((r) => r.posted_at).length;
 
     console.log(`Postings fetched: ${postings.length}`);
+    console.log(`Skipped missing id: ${skippedMissingId}`);
     console.log(`Rows with posted_at: ${withPosted}/${rows.length}`);
     console.log(`Sample posted_at values:`, sample);
 
-    if (rows.length) {
-      const { error } = await supabase.from("jobs").upsert(rows, { onConflict: "fingerprint" });
-      if (error) throw error;
-    }
+    await upsertJobs(rows);
+    await markStaleInactive(slug, runIso);
 
-    if (seenFingerprints.length) {
-      const inList = `(${seenFingerprints.map((f) => `"${f.replaceAll('"', '\\"')}"`).join(",")})`;
-      const { error: staleErr } = await supabase
-        .from("jobs")
-        .update({ is_active: false })
-        .eq("source", "lever")
-        .eq("source_company", slug)
-        .not("fingerprint", "in", inList);
-
-      if (staleErr) throw staleErr;
-    }
-
-    console.log(`Upserted: ${rows.length}`);
+    console.log(`Upserted active: ${rows.length}`);
   }
 
   console.log("\nDone.");
