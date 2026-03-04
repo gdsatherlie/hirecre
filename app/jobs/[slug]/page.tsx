@@ -22,8 +22,9 @@ type Job = {
   last_seen_at: string | null;
   is_active: boolean | null;
 
-  description: string | null; // may be html or text depending on source
-  description_text: string | null; // sometimes NOT plain text (can still contain html)
+  description: string | null;
+  description_text: string | null;
+
   has_pay: boolean | null;
   pay_extracted: string | null;
 };
@@ -36,63 +37,52 @@ function supaAdmin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-/** Minimal entity decode (enough for job descriptions) */
 function decodeEntities(s: string) {
   return String(s || "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, "/");
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\u00a0/g, " "); // non-breaking space char
 }
 
-/**
- * Convert HTML-ish content into readable text while preserving structure:
- * - headings become "Header:\n"
- * - list items become "• item"
- * - <br>/<p>/<div> become line breaks
- */
-function htmlToReadableText(input: string) {
-  let html = decodeEntities(String(input || ""));
+function stripHtml(input: string) {
+  const html = String(input || "");
+  return decodeEntities(html)
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<\/(p|div|br|li|h1|h2|h3|h4)>/gi, "\n") // add line breaks at common block ends
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
 
-  // strip script/style blocks
-  html = html.replace(/<script[\s\S]*?<\/script>/gi, " ");
-  html = html.replace(/<style[\s\S]*?<\/style>/gi, " ");
+function looksLikeHtml(s: string) {
+  return /<\s*[a-z][\s\S]*>/i.test(s);
+}
 
-  // normalize common block tags into newlines
-  html = html.replace(/<\/(p|div|section|article|header|footer|blockquote)>/gi, "\n\n");
-  html = html.replace(/<(p|div|section|article|header|footer|blockquote)[^>]*>/gi, "");
+function cleanDescription(job: Job) {
+  const raw = (job.description_text || job.description || "").toString();
+  if (!raw.trim()) return "";
 
-  // headings -> newline + text + newline
-  html = html.replace(/<h[1-6][^>]*>/gi, "\n\n");
-  html = html.replace(/<\/h[1-6]>/gi, ":\n");
+  // If description_text accidentally contains HTML, strip it.
+  const normalized = looksLikeHtml(raw) ? stripHtml(raw) : decodeEntities(raw);
 
-  // line breaks
-  html = html.replace(/<br\s*\/?>/gi, "\n");
+  // Also strip HTML if any got into description field
+  const finalText = looksLikeHtml(normalized) ? stripHtml(normalized) : normalized;
 
-  // list items -> bullet lines
-  html = html.replace(/<li[^>]*>/gi, "\n• ");
-  html = html.replace(/<\/li>/gi, "");
-  html = html.replace(/<\/?(ul|ol)[^>]*>/gi, "\n");
-
-  // links: keep anchor text, drop href
-  html = html.replace(/<a [^>]*>/gi, "");
-  html = html.replace(/<\/a>/gi, "");
-
-  // strong/em -> keep text only
-  html = html.replace(/<\/?(strong|b|em|i|u|span)[^>]*>/gi, "");
-
-  // remove any remaining tags
-  html = html.replace(/<[^>]+>/g, " ");
-
-  // cleanup whitespace
-  html = html.replace(/[ \t]+\n/g, "\n");
-  html = html.replace(/\n{3,}/g, "\n\n");
-  html = html.replace(/[ \t]{2,}/g, " ");
-  return html.trim();
+  // Collapse excessive blank lines
+  return finalText
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function fmtDate(iso: string | null) {
@@ -110,38 +100,15 @@ function safePay(job: Job) {
   return p;
 }
 
-function isHtmlish(s: string) {
-  const t = (s || "").trim();
-  if (!t) return false;
-  return /<\/?[a-z][\s\S]*>/i.test(t) || t.includes("&lt;") || t.includes("&gt;");
-}
-
-/** Always produce clean readable text, even if description_text contains HTML */
-function getNormalizedDescription(job: Job) {
-  const raw = (job.description_text || "").trim() || (job.description || "").trim();
-  if (!raw) return "";
-
-  // If it looks like HTML, convert it; if it's plain text, still decode entities + cleanup.
-  const text = isHtmlish(raw) ? htmlToReadableText(raw) : decodeEntities(raw).trim();
-
-  // final cleanup
-  return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-// “Don’t get flagged” index guard:
-// - Only index active jobs
-// - Must have title + company + apply URL
-// - Must have enough text to not be “thin content”
-function shouldIndex(job: Job) {
+// Only index active jobs with enough substance
+function shouldIndex(job: Job, descText: string) {
   if (!job.is_active) return false;
 
   const titleOk = (job.title || "").trim().length >= 5;
   const companyOk = (job.company || job.source_company || "").trim().length >= 2;
   const urlOk = !!(job.url && job.url.startsWith("http"));
 
-  const text = getNormalizedDescription(job);
-  const descOk = text.length >= 200;
-
+  const descOk = descText.trim().length >= 200;
   return titleOk && companyOk && urlOk && descOk;
 }
 
@@ -158,48 +125,7 @@ async function getJobBySlug(slug: string): Promise<Job | null> {
   return (data as Job) ?? null;
 }
 
-/** Render helper: paragraphs + bullets */
-function renderDescriptionBlocks(text: string) {
-  const blocks = text.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-
-  return blocks.map((block, idx) => {
-    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
-    const bulletLines = lines.filter((l) => l.startsWith("• "));
-    const nonBulletLines = lines.filter((l) => !l.startsWith("• "));
-
-    const looksLikeList =
-      bulletLines.length >= 2 && bulletLines.length >= Math.max(1, Math.floor(lines.length / 2));
-
-    if (looksLikeList) {
-      return (
-        <ul key={idx} className="my-4 list-disc space-y-1 pl-6">
-          {bulletLines.map((l, i) => (
-            <li key={i}>{l.replace(/^•\s*/, "")}</li>
-          ))}
-        </ul>
-      );
-    }
-
-    // If it’s a “Heading:” line, make it stand out
-    if (lines.length === 1 && lines[0].endsWith(":") && lines[0].length <= 80) {
-      return (
-        <h3 key={idx} className="mt-6 text-base font-semibold text-gray-900">
-          {lines[0].replace(/:$/, "")}
-        </h3>
-      );
-    }
-
-    return (
-      <p key={idx} className="my-3 leading-relaxed">
-        {nonBulletLines.join(" ")}
-      </p>
-    );
-  });
-}
-
-export async function generateMetadata(
-  { params }: { params: Promise<{ slug: string }> }
-): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const job = await getJobBySlug(slug);
 
@@ -210,7 +136,8 @@ export async function generateMetadata(
   const company = (job.company || job.source_company || "Company").trim();
   const title = (job.title || "Job").trim();
 
-  const indexable = shouldIndex(job);
+  const descText = cleanDescription(job);
+  const indexable = shouldIndex(job, descText);
 
   return {
     title: `${title} at ${company} | HireCRE`,
@@ -243,10 +170,17 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
     job.location_raw ||
     "";
 
-  const descText = getNormalizedDescription(job);
-  const indexable = shouldIndex(job);
+  const descText = cleanDescription(job);
+  const indexable = shouldIndex(job, descText);
 
-  const jsonLd: Record<string, any> = {
+  const paragraphs = descText
+    ? descText
+        .split("\n")
+        .map((p) => p.trim())
+        .filter(Boolean)
+    : [];
+
+  const jsonLd = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
     title,
@@ -262,7 +196,7 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
           },
         }
       : undefined,
-    description: descText ? descText.slice(0, 5000) : undefined,
+    description: descText.slice(0, 5000),
     url: job.url || undefined,
     directApply: true,
   };
@@ -271,7 +205,8 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
       {!indexable ? (
         <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          This listing is visible to users, but it’s not eligible for search indexing (missing details or too little description).
+          This listing is visible to users, but it’s not eligible for search indexing (missing details or too little
+          description).
         </div>
       ) : null}
 
@@ -315,16 +250,14 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
         </a>
       </div>
 
-      <section className="mt-8">
+      <section className="mt-8 space-y-3">
         <h2 className="text-xl font-semibold text-gray-900">Job description</h2>
 
         <div className="prose prose-neutral max-w-none">
-          {descText ? (
-            <div className="mt-3">{renderDescriptionBlocks(descText)}</div>
+          {paragraphs.length ? (
+            paragraphs.map((p, idx) => <p key={idx}>{p}</p>)
           ) : (
-            <p className="mt-3">
-              This job did not include a description. Please check the employer’s posting for full details.
-            </p>
+            <p>This job did not include a description. Please check the employer’s posting for full details.</p>
           )}
         </div>
       </section>
@@ -332,8 +265,8 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
       <section className="mt-10 rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
         <h3 className="mb-2 font-semibold text-gray-900">About this listing</h3>
         <p>
-          HireCRE is a job aggregator. We display jobs sourced from publicly available employer postings and link you
-          to the employer’s official site to apply. We are not affiliated with the employer unless stated.
+          HireCRE is a job aggregator. We display jobs sourced from publicly available employer postings and link you to
+          the employer’s official site to apply. We are not affiliated with the employer unless stated.
         </p>
         <p className="mt-2">Always confirm job details on the employer’s site before applying.</p>
       </section>
