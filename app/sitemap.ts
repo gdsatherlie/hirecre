@@ -1,71 +1,76 @@
+// app/jobs/sitemap.ts
 import type { MetadataRoute } from "next";
+import { createClient } from "@supabase/supabase-js";
 
-const SITE_URL = "https://hirecre.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://hirecre.com";
 
-type Entry = {
-  path: string;
-  changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
-  priority: number;
-};
+function supaPublic() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
 
-const STATIC_PAGES: Entry[] = [
-  { path: "/", changeFrequency: "daily", priority: 1.0 },
+function stripHtml(html: string) {
+  return String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  // Core
-  { path: "/jobs", changeFrequency: "hourly", priority: 1.0 },
-  { path: "/resources", changeFrequency: "weekly", priority: 0.7 },
+// Keep it conservative — only sitemap pages that look “real”
+function shouldIndexJob(j: {
+  title: string | null;
+  company: string | null;
+  source_company: string | null;
+  url: string | null;
+  description_text: string | null;
+  description: string | null;
+  is_active: boolean | null;
+}) {
+  if (!j.is_active) return false;
 
-  // Interview hub + sitemap
-  { path: "/interview-prep", changeFrequency: "weekly", priority: 0.9 },
-  { path: "/interview-prep/sitemap", changeFrequency: "weekly", priority: 0.8 },
+  const titleOk = (j.title || "").trim().length >= 5;
+  const companyOk = (j.company || j.source_company || "").trim().length >= 2;
+  const urlOk = !!(j.url && /^https?:\/\//i.test(j.url));
 
-  // Debt & credit
-  { path: "/interview-prep/bridge-lending-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/dscr-vs-debt-yield", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/loan-to-cost-ltc", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/debt-yield-explained", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/underwriting-walkthrough", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/sponsor-risk-analysis", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/exit-underwriting", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/risk-and-structure", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/loan-sizing-cheat-sheet", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/broker-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/credit-memo-template", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/common-mistakes", changeFrequency: "monthly", priority: 0.6 },
-  { path: "/interview-prep/dscr-minimums", changeFrequency: "monthly", priority: 0.7 },
+  const text = (j.description_text || stripHtml(j.description || "") || "").trim();
+  const descOk = text.length >= 250;
 
-  // Equity
-  { path: "/interview-prep/repe-interview-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/equity-returns-101", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/equity-waterfall-basics", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/preferred-return", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/promote-structure", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/cap-rate-explained", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/explain-irr-interview", changeFrequency: "monthly", priority: 0.7 },
+  return titleOk && companyOk && urlOk && descOk;
+}
 
-  // Acquisitions / AM
-  { path: "/interview-prep/acquisitions-interview-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/asset-management-interview-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/rent-roll-t12-deep-dive", changeFrequency: "monthly", priority: 0.7 },
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const supabase = supaPublic();
 
-  // Development
-  { path: "/interview-prep/development-interview-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/construction-budget-101", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/development-returns-yoc", changeFrequency: "monthly", priority: 0.7 },
+  // Pull only the columns we need (fast)
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("slug,title,company,source_company,url,description,description_text,is_active,posted_at,last_seen_at")
+    .eq("is_active", true)
+    .not("slug", "is", null)
+    .limit(50000); // safety cap
 
-  // Leasing / Brokerage / Ops
-  { path: "/interview-prep/leasing-interview-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/brokerage-interview-questions", changeFrequency: "monthly", priority: 0.7 },
-  { path: "/interview-prep/property-management-interview-questions", changeFrequency: "monthly", priority: 0.7 },
-];
+  if (error) {
+    // If RLS blocks this, your board probably also breaks logged-out.
+    // Return empty sitemap rather than crashing builds.
+    return [];
+  }
 
-export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
-  return STATIC_PAGES.map((p) => ({
-    url: `${SITE_URL}${p.path}`,
-    lastModified: now,
-    changeFrequency: p.changeFrequency,
-    priority: p.priority,
-  }));
+  const rows = (data || [])
+    .filter((j) => j.slug && shouldIndexJob(j))
+    .map((j) => {
+      const lastMod = j.last_seen_at || j.posted_at;
+      return {
+        url: `${SITE_URL}/jobs/${j.slug}`,
+        lastModified: lastMod ? new Date(lastMod) : now,
+        changeFrequency: "daily" as const,
+        priority: 0.6,
+      };
+    });
+
+  return rows;
 }
