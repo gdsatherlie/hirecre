@@ -127,7 +127,11 @@ function cleanGreenhouseSlug(input) {
  *  - TSV: "Company Name<TAB>slug-or-url"
  *
  * Returns:
- *  [{ slug: "berkadia", companyName: "Berkadia" }, ...]
+ *  [{ slug: "berkadia", companyName: "Berkadia" | null }, ...]
+ *
+ * IMPORTANT CHANGE:
+ *  - If no Company Name provided, companyName is NULL (NOT slug).
+ *    This prevents ugly slugs showing as the company display name.
  */
 function readSources() {
   const file = sourcesFilePath();
@@ -156,7 +160,7 @@ function readSources() {
 
     out.push({
       slug,
-      companyName: companyName || slug, // fallback pretty name
+      companyName: companyName || null, // ✅ DO NOT FALL BACK TO SLUG
     });
   }
 
@@ -190,8 +194,7 @@ async function fetchGreenhouseJobs(companySlug) {
 async function upsertJobs(rows) {
   if (!rows.length) return;
 
-  // ✅ IMPORTANT: conflict on (source, source_job_id)
-  // This aligns with the unique index you’re trying to create.
+  // conflict on (source, source_job_id)
   const { error } = await supabase
     .from("jobs")
     .upsert(rows, { onConflict: "source,source_job_id" });
@@ -200,7 +203,6 @@ async function upsertJobs(rows) {
 }
 
 async function markStaleInactive(companySlug, runIso) {
-  // Anything not touched in this run becomes inactive
   const { error } = await supabase
     .from("jobs")
     .update({ is_active: false })
@@ -244,7 +246,7 @@ async function main() {
 
   for (const src of sources) {
     const companySlug = src.slug;
-    const companyName = src.companyName;
+    const companyName = src.companyName; // null unless TSV provides it
 
     try {
       const jobs = await fetchGreenhouseJobs(companySlug);
@@ -260,7 +262,6 @@ async function main() {
         totalKept += 1;
 
         if (!sourceJobId) {
-          // ✅ With unique index on (source, source_job_id), we must have an ID.
           totalSkippedNoId += 1;
           continue;
         }
@@ -280,7 +281,7 @@ async function main() {
           source_company: companySlug, // greenhouse board slug (sync key)
 
           title,
-          company: companyName, // human display name
+          company: companyName, // ✅ real display name if TSV, else NULL
           url: jobUrl,
 
           description: descriptionHtml,
@@ -289,7 +290,6 @@ async function main() {
           has_pay: pay.has_pay,
           pay_extracted: pay.pay_extracted,
 
-          // Greenhouse API doesn’t always provide a clean "posted" date; updated_at is OK as a proxy.
           posted_at: j?.updated_at ? new Date(j.updated_at).toISOString() : null,
 
           fingerprint: buildFingerprint({
@@ -315,7 +315,6 @@ async function main() {
     }
   }
 
-  // Enforce GitHub allowlist globally (slugs only)
   await enforceAllowlist(sources.map((s) => s.slug));
 
   console.log("---- Summary ----");
