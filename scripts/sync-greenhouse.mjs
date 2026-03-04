@@ -149,11 +149,14 @@ function readSources() {
 
   const out = [];
   for (const line of rawLines) {
-    const parts = line.split("\t").map((p) => p.trim()).filter(Boolean);
+const parts = line.includes("\t")
+  ? line.split("\t")
+  : line.split(/\s{2,}/); // treat 2+ spaces as separator
+const cleaned = parts.map((p) => p.trim()).filter(Boolean);
 
     // TSV: Company Name<TAB>slug-or-url
-    const companyName = parts.length >= 2 ? parts[0] : null;
-    const slugOrUrl = parts.length >= 2 ? parts[1] : parts[0];
+const companyName = cleaned.length >= 2 ? cleaned[0] : null;
+const slugOrUrl = cleaned.length >= 2 ? cleaned[1] : cleaned[0];
 
     const slug = cleanGreenhouseSlug(slugOrUrl);
     if (!slug) continue;
