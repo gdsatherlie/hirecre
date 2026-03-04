@@ -17,6 +17,9 @@ import { createClient } from "@supabase/supabase-js";
 type Job = {
   id: string;
 
+  // NEW: for SEO pages
+  slug?: string | null;
+
   // core
   source: string | null;
   title: string | null;
@@ -408,17 +411,16 @@ export default function BoardPage() {
   useEffect(() => {
     setPage(1);
   }, [q, company, state, source, remoteOnly, payOnly]);
-  
-// Scroll to top when changing pages
-useEffect(() => {
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-}, [page]);
+
+  // Scroll to top when changing pages
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [page]);
 
   useEffect(() => {
-  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-}, [q, company, state, source, remoteOnly, payOnly]);
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [q, company, state, source, remoteOnly, payOnly]);
 
-  
   // ----- Fetch jobs -----
   useEffect(() => {
     (async () => {
@@ -467,10 +469,7 @@ useEffect(() => {
 
         const { data, error, count: c } = await query.range(from, to);
 
-        if (error) {
-          // IMPORTANT: show the real error (RLS issues show up here)
-          throw error;
-        }
+        if (error) throw error;
 
         setJobs((data ?? []) as Job[]);
         setCount(c ?? 0);
@@ -563,7 +562,6 @@ useEffect(() => {
 
   async function signOut() {
     await supabase.auth.signOut();
-    // stay on board; it's public
     setUserEmail(null);
     setUserId(null);
     setSaveSearchMsg("Signed out.");
@@ -601,17 +599,16 @@ useEffect(() => {
             )}
           </div>
 
-<div className="text-right">
-  <div className="text-sm text-gray-600">
-    <span className="font-semibold text-gray-900">{count.toLocaleString()}</span> jobs
-  </div>
+          <div className="text-right">
+            <div className="text-sm text-gray-600">
+              <span className="font-semibold text-gray-900">{count.toLocaleString()}</span> jobs
+            </div>
 
-  {/* NEW: page indicator under the count (matches bottom styling) */}
-  <div className="mt-1 text-sm text-gray-600">
-    Page <span className="font-semibold text-gray-900">{page}</span> of{" "}
-    <span className="font-semibold text-gray-900">{totalPages}</span>
-  </div>
-</div>
+            <div className="mt-1 text-sm text-gray-600">
+              Page <span className="font-semibold text-gray-900">{page}</span> of{" "}
+              <span className="font-semibold text-gray-900">{totalPages}</span>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -725,7 +722,7 @@ useEffect(() => {
 
         {saveSearchMsg ? <div className="mt-3 text-sm text-gray-700">{saveSearchMsg}</div> : null}
 
-        {/* NEW: show fetch error if present */}
+        {/* show fetch error if present */}
         {fetchError ? (
           <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
             <div className="font-semibold">Jobs failed to load</div>
@@ -775,14 +772,25 @@ useEffect(() => {
 
                 const sourceLabel = (job.source ?? "unknown").toLowerCase();
 
+                const internalHref = job.slug ? `/jobs/${job.slug}` : null;
+                const externalHref = job.url || null;
+
                 return (
                   <div key={job.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <div className="text-lg font-semibold text-gray-900">
-                          {job.url ? (
+                          {internalHref ? (
+                            <Link
+                              href={internalHref}
+                              className="hover:underline"
+                              onClick={() => trackJobClick(job.id)}
+                            >
+                              {job.title ?? "Untitled role"}
+                            </Link>
+                          ) : externalHref ? (
                             <a
-                              href={job.url}
+                              href={externalHref}
                               target="_blank"
                               rel="noreferrer"
                               className="hover:underline"
@@ -812,9 +820,17 @@ useEffect(() => {
                       </div>
 
                       <div className="flex shrink-0 items-center gap-2">
-                        {job.url && (
+                        {internalHref ? (
+                          <Link
+                            href={internalHref}
+                            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                            onClick={() => trackJobClick(job.id)}
+                          >
+                            View job
+                          </Link>
+                        ) : externalHref ? (
                           <a
-                            href={job.url}
+                            href={externalHref}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -822,7 +838,7 @@ useEffect(() => {
                           >
                             View job
                           </a>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>
