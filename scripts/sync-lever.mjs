@@ -11,14 +11,15 @@
  * Upserts into Supabase table: jobs
  *
  * Uses your schema:
+ * - slug ✅
  * - is_active
- * - fingerprint (kept, but NOT used as conflict key anymore)
+ * - fingerprint
  * - source_company, last_seen_at
  * - has_pay, pay_extracted
- * - posted_at ✅
+ * - posted_at
  *
  * IMPORTANT:
- * Your DB now enforces UNIQUE(source, source_job_id)
+ * DB enforces UNIQUE(source, source_job_id)
  * so we upsert onConflict: "source,source_job_id"
  */
 
@@ -101,7 +102,6 @@ function pickLocationParts(posting) {
   return { location_raw: txt, location_city: txt || null, location_state: null };
 }
 
-// ✅ Lever posted time: listedAt preferred, createdAt fallback (epoch ms)
 function leverPostedAt(p) {
   const ms = p?.listedAt ?? p?.createdAt ?? null;
   if (typeof ms !== "number" || !ms) return null;
@@ -110,10 +110,17 @@ function leverPostedAt(p) {
   return d.toISOString();
 }
 
+function makeSlug(company, title, source, id) {
+  return `${company || "company"}-${title || "job"}-${source}-${id}`
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 async function upsertJobs(rows) {
   if (!rows.length) return;
 
-  // ✅ IMPORTANT: conflict on (source, source_job_id)
   const { error } = await supabase
     .from("jobs")
     .upsert(rows, { onConflict: "source,source_job_id" });
@@ -122,8 +129,6 @@ async function upsertJobs(rows) {
 }
 
 async function markStaleInactive(sourceCompanySlug, runIso) {
-  // ✅ Anything not touched in this run becomes inactive.
-  // This is faster/cleaner than building a giant IN(...) list.
   const { error } = await supabase
     .from("jobs")
     .update({ is_active: false })
@@ -143,7 +148,6 @@ async function main() {
 
   const sources = parseSources(fs.readFileSync(abs, "utf8"));
   console.log(`Lever sources: ${sources.length}`);
-  console.log(`SYNC-LEVER VERSION: conflict key = (source, source_job_id) ✅`);
 
   for (const { companyPretty, slug } of sources) {
     console.log(`\n== ${companyPretty} (${slug}) ==`);
@@ -169,16 +173,20 @@ async function main() {
       const descriptionText = p.descriptionPlain || stripHtml(descriptionHtml);
 
       const pay = extractPayFromText(descriptionText);
+      const title = p.text || null;
+      const company = companyPretty || slug;
+      const jobSlug = makeSlug(company, title, "lever", source_job_id);
 
       rows.push({
+        slug: jobSlug,
         source: "lever",
         source_job_id,
         fingerprint,
 
-        company: companyPretty,
+        company,
         source_company: slug,
 
-        title: p.text || null,
+        title,
         url: p.hostedUrl || p.applyUrl || null,
 
         location_raw,
@@ -199,24 +207,12 @@ async function main() {
       });
     }
 
-    // 🔥 DEBUG so you can SEE production is running this code
-    const sample = rows.slice(0, 3).map((r, i) => ({
-      i,
-      title: r.title,
-      source_job_id: r.source_job_id,
-      posted_at: r.posted_at,
-    }));
-    const withPosted = rows.filter((r) => r.posted_at).length;
-
     console.log(`Postings fetched: ${postings.length}`);
     console.log(`Skipped missing id: ${skippedMissingId}`);
-    console.log(`Rows with posted_at: ${withPosted}/${rows.length}`);
-    console.log(`Sample posted_at values:`, sample);
+    console.log(`Upserted active: ${rows.length}`);
 
     await upsertJobs(rows);
     await markStaleInactive(slug, runIso);
-
-    console.log(`Upserted active: ${rows.length}`);
   }
 
   console.log("\nDone.");
