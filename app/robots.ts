@@ -12,7 +12,9 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/login", "/signup", "/alerts", "/r/"],
       },
     ],
-    sitemap: `${SITE_URL}/sitemap.xml`,
+    // Point Google at both sitemaps. app/sitemap.ts generates the
+    // main one; app/jobs/sitemap.ts generates the jobs-only one.
+    sitemap: [`${SITE_URL}/sitemap.xml`, `${SITE_URL}/jobs/sitemap.xml`],
     host: SITE_URL,
   };
 }

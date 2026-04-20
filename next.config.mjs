@@ -35,6 +35,18 @@ const nextConfig = {
       },
     ];
   },
+
+  async redirects() {
+    return [
+      // Typo directory existed at /interview-prep/quity-waterfall-basics;
+      // 301 any stray links or Google index entries to the correct URL.
+      {
+        source: "/interview-prep/quity-waterfall-basics",
+        destination: "/interview-prep/equity-waterfall-basics",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
