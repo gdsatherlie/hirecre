@@ -351,12 +351,24 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const job = await getJobBySlug(slug);
 
-  if (!job || !job.is_active) {
+  if (!job) {
     return { title: "Job not found | HireCRE", robots: { index: false, follow: false } };
   }
 
   const company = (job.company || job.source_company || "Company").trim();
   const title = (job.title || "Job").trim();
+
+  // Expired jobs keep their URL alive (with noindex) so any existing
+  // inbound links still land on a useful page with related roles
+  // instead of a 404. This preserves crawl budget and user experience.
+  if (!job.is_active) {
+    return {
+      title: `${title} at ${company} (role closed) | HireCRE`,
+      description: `This ${title} role at ${company} is no longer accepting applications. Browse similar commercial real estate jobs on HireCRE.`,
+      alternates: { canonical: `${SITE_URL}/jobs/${job.slug}` },
+      robots: { index: false, follow: true },
+    };
+  }
 
   const descText = cleanDescription(job);
   const indexable = shouldIndex(job, descText);
@@ -375,14 +387,92 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
+type RelatedJob = {
+  id: string;
+  slug: string | null;
+  title: string | null;
+  company: string | null;
+  location_city: string | null;
+  location_state: string | null;
+  location_raw: string | null;
+  posted_at: string | null;
+  has_pay: boolean | null;
+  pay_extracted: string | null;
+};
+
+// Fetch up to `limit` active jobs to show as "related" on an expired
+// listing. Prefer same company, fall back to same state, final
+// fallback to most-recent.
+async function getRelatedJobs(job: Job, limit = 6): Promise<RelatedJob[]> {
+  const admin = supabaseAdmin();
+  const seen = new Set<string>([job.slug ?? ""]);
+  const results: RelatedJob[] = [];
+  const select =
+    "id,slug,title,company,location_city,location_state,location_raw,posted_at,has_pay,pay_extracted";
+
+  const push = (rows: RelatedJob[]) => {
+    for (const row of rows) {
+      if (!row.slug || seen.has(row.slug)) continue;
+      seen.add(row.slug);
+      results.push(row);
+      if (results.length >= limit) break;
+    }
+  };
+
+  if (job.company) {
+    const { data } = await admin
+      .from("jobs")
+      .select(select)
+      .eq("is_active", true)
+      .not("slug", "is", null)
+      .eq("company", job.company)
+      .order("posted_at", { ascending: false })
+      .limit(limit * 2);
+    push((data ?? []) as RelatedJob[]);
+  }
+
+  if (results.length < limit && job.location_state) {
+    const { data } = await admin
+      .from("jobs")
+      .select(select)
+      .eq("is_active", true)
+      .not("slug", "is", null)
+      .eq("location_state", job.location_state)
+      .order("posted_at", { ascending: false })
+      .limit(limit * 2);
+    push((data ?? []) as RelatedJob[]);
+  }
+
+  if (results.length < limit) {
+    const { data } = await admin
+      .from("jobs")
+      .select(select)
+      .eq("is_active", true)
+      .not("slug", "is", null)
+      .order("posted_at", { ascending: false })
+      .limit(limit * 2);
+    push((data ?? []) as RelatedJob[]);
+  }
+
+  return results.slice(0, limit);
+}
+
 export default async function JobPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const job = await getJobBySlug(slug);
 
-  if (!job || !job.is_active) return notFound();
+  // Truly unknown slug → 404. Inactive/expired jobs render a soft
+  // "role closed" view below so Google can deindex without losing
+  // internal link juice to the board + similar roles.
+  if (!job) return notFound();
 
   const company = (job.company || job.source_company || "Company").trim();
   const title = (job.title || "Untitled role").trim();
+
+  if (!job.is_active) {
+    const related = await getRelatedJobs(job);
+    return <ExpiredJobPage job={job} title={title} company={company} related={related} />;
+  }
 
   const posted = fmtDate(job.posted_at);
   const pay = safePay(job);
@@ -628,6 +718,100 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
       </section>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+    </main>
+  );
+}
+
+function ExpiredJobPage({
+  job,
+  title,
+  company,
+  related,
+}: {
+  job: Job;
+  title: string;
+  company: string;
+  related: RelatedJob[];
+}) {
+  return (
+    <main className="mx-auto w-full max-w-3xl px-4 py-10">
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+          Role closed
+        </div>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-gray-900 sm:text-3xl">
+          {title} at {company}
+        </h1>
+        <p className="mt-3 text-base text-gray-600">
+          This role is no longer accepting applications. It may have been
+          filled, withdrawn, or removed from the employer&apos;s career site.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <a
+            href="/board"
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Browse all active jobs
+          </a>
+          <a
+            href="/alerts"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+          >
+            Get job alerts
+          </a>
+        </div>
+      </div>
+
+      {related.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Similar active CRE roles
+          </h2>
+          <ul className="mt-4 grid gap-4">
+            {related.map((r) => (
+              <li
+                key={r.id}
+                className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="text-base font-semibold text-gray-900">
+                      {r.slug ? (
+                        <a href={`/jobs/${r.slug}`} className="hover:underline">
+                          {r.title ?? "Untitled role"}
+                        </a>
+                      ) : (
+                        r.title ?? "Untitled role"
+                      )}
+                    </div>
+                    <div className="mt-1 text-sm text-gray-700">
+                      <span className="font-medium">{r.company ?? "—"}</span>
+                      {(r.location_city || r.location_state) ? (
+                        <>
+                          <span className="mx-1 text-gray-400">•</span>
+                          <span>
+                            {[r.location_city, r.location_state]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  {r.slug ? (
+                    <a
+                      href={`/jobs/${r.slug}`}
+                      className="mt-3 inline-flex shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 sm:mt-0"
+                    >
+                      View job
+                    </a>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </main>
   );
 }
