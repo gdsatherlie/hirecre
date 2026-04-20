@@ -29,7 +29,7 @@ export default function SiteHeader() {
         <div className="flex items-baseline gap-3">
 
 <Link href="/" className="text-lg font-extrabold tracking-tight">
-  HireCRE <span className="ml-2 rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">TEST</span>
+  HireCRE
 </Link>
           
 
