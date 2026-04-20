@@ -2,6 +2,7 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { pickPrepLinks } from "@/lib/role-prep-links";
 
 type Job = {
   slug: string;
@@ -675,29 +676,62 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
         </div>
       </section>
 
-      {/* Cross-links + About */}
-      <section className="mt-10 space-y-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-900">Keep going</h3>
-          <p className="mt-1 text-sm text-gray-700">
-            Want help landing the role? Use our tools and prep hub.
-          </p>
+      {/* Role-specific prep links (content value-add on every job page). */}
+      {(() => {
+        const prepLinks = pickPrepLinks(title);
+        return (
+          <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Preparing for this role?
+            </h2>
+            <p className="mt-2 text-sm text-gray-700">
+              The HireCRE editorial library has practitioner-written guides on
+              the concepts this seat typically tests for. Picked for{" "}
+              <span className="font-semibold">{title}</span>:
+            </p>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {prepLinks.map((link) => (
+                <li
+                  key={link.href}
+                  className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm"
+                >
+                  <a
+                    href={link.href}
+                    className="font-semibold text-blue-700 hover:underline"
+                  >
+                    {link.title}
+                  </a>
+                  {link.note ? (
+                    <p className="mt-1 text-xs text-gray-600">{link.note}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5 flex flex-wrap gap-3 text-sm">
+              <a
+                href="/interview-prep"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                Full Interview Prep hub →
+              </a>
+              <a
+                href="/tools/salary-calculator"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                Salary Calculator
+              </a>
+              <a
+                href="/resources"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                Resources
+              </a>
+            </div>
+          </section>
+        );
+      })()}
 
-          <div className="mt-3 flex flex-wrap gap-3">
-            <a
-              href="/resources"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-            >
-              Resources
-            </a>
-            <a
-              href="/interview-prep"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-            >
-              CRE Interview Prep Hub
-            </a>
-          </div>
-        </div>
+      <section className="mt-6 space-y-4">
 
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
           <h3 className="mb-2 font-semibold text-gray-900">About this listing</h3>
