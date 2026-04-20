@@ -156,6 +156,136 @@ export default async function BoardPage() {
       {/* Interactive client board with filters + pagination */}
       <BoardClient />
 
+      {/* Editorial content below the board. Gives the page substantive
+          unique copy beyond the job listings themselves — helps the
+          page read as an editorial CRE careers resource rather than a
+          pure aggregator. */}
+      <section
+        className="mx-auto mt-12 max-w-6xl px-4 pb-12"
+        aria-labelledby="about-cre-careers"
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2
+              id="about-cre-careers"
+              className="text-lg font-semibold text-gray-900"
+            >
+              About commercial real estate careers
+            </h2>
+            <div className="mt-3 space-y-3 text-sm leading-6 text-gray-700">
+              <p>
+                Commercial real estate (CRE) careers span the full capital
+                stack — from senior debt and preferred equity at lenders and
+                mortgage REITs, through common equity at private equity real
+                estate sponsors and institutional investment managers, to
+                operating roles at developers, REITs, and property-management
+                platforms. Each seat demands a different mix of underwriting,
+                relationship, and execution skills.
+              </p>
+              <p>
+                Most candidates enter via one of four paths: brokerage (capital
+                markets, investment sales, or leasing), bank CRE credit,
+                analyst programs at REPE or debt funds, or development
+                associate roles at sponsors. Each path carries distinct comp
+                dynamics and exit options. The HireCRE{" "}
+                <Link
+                  href="/commercial-real-estate-career-guide"
+                  className="font-semibold text-blue-700 hover:underline"
+                >
+                  Career Guide
+                </Link>{" "}
+                maps these paths against the deal cycle so candidates can
+                position intentionally.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Interviewing for CRE roles
+            </h2>
+            <div className="mt-3 space-y-3 text-sm leading-6 text-gray-700">
+              <p>
+                CRE interviews test a consistent set of underwriting concepts:
+                DSCR, debt yield, loan sizing, cap rates, equity waterfalls,
+                promote structures, and preferred returns. At the analyst and
+                associate level, the test is whether you can link the numbers
+                to the investment decision — not just compute them.
+              </p>
+              <p>
+                Our{" "}
+                <Link
+                  href="/interview-prep"
+                  className="font-semibold text-blue-700 hover:underline"
+                >
+                  Interview Prep hub
+                </Link>{" "}
+                covers each concept with worked examples and interview-framing
+                language written by CRE practitioners, including:{" "}
+                <Link
+                  href="/interview-prep/dscr-vs-debt-yield"
+                  className="font-semibold text-blue-700 hover:underline"
+                >
+                  DSCR vs Debt Yield
+                </Link>
+                ,{" "}
+                <Link
+                  href="/interview-prep/cap-rate-explained"
+                  className="font-semibold text-blue-700 hover:underline"
+                >
+                  Cap Rate
+                </Link>
+                ,{" "}
+                <Link
+                  href="/interview-prep/equity-waterfall-basics"
+                  className="font-semibold text-blue-700 hover:underline"
+                >
+                  Equity Waterfall
+                </Link>
+                , and the{" "}
+                <Link
+                  href="/interview-prep/underwriting-walkthrough"
+                  className="font-semibold text-blue-700 hover:underline"
+                >
+                  full underwriting walkthrough
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">
+            How HireCRE sources jobs
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-gray-700">
+            We aggregate active commercial real estate and proptech roles from
+            employer career sites every six hours. Each listing links to the
+            employer&apos;s official posting for application — we do not host
+            third-party applications. Our job pages add an{" "}
+            <span className="font-semibold">Opportunity Snapshot</span> —
+            machine-generated summary, key requirements, and key
+            responsibilities derived from the employer&apos;s description — so
+            candidates can scan and shortlist quickly. See the{" "}
+            <Link
+              href="/about"
+              className="font-semibold text-blue-700 hover:underline"
+            >
+              About page
+            </Link>{" "}
+            for our sourcing methodology and the{" "}
+            <Link
+              href="/resources"
+              className="font-semibold text-blue-700 hover:underline"
+            >
+              Resources hub
+            </Link>{" "}
+            for curated CRE books, certifications, and tools.
+          </p>
+        </div>
+      </section>
+
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }}
