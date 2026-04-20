@@ -40,6 +40,7 @@ export default function SiteHeader() {
 
         <nav className="flex items-center gap-1">
           <NavLink href="/board" label="Jobs" />
+          <NavLink href="/interview-prep" label="Interview Prep" />
           <NavLink href="/alerts" label="Alerts" />
           <NavLink href="/about" label="About" />
           <NavLink href="/contact" label="Contact" />

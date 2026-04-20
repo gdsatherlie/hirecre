@@ -1,65 +1,90 @@
 import Link from "next/link";
 
+type FooterLink = { href: string; label: string };
+
+const PRODUCT_LINKS: FooterLink[] = [
+  { href: "/", label: "Home" },
+  { href: "/board", label: "Jobs" },
+  { href: "/interview-prep", label: "Interview Prep" },
+  { href: "/alerts", label: "Job Alerts" },
+  { href: "/resources", label: "Resources" },
+];
+
+const GUIDE_LINKS: FooterLink[] = [
+  { href: "/commercial-real-estate-career-guide", label: "CRE Career Guide" },
+  { href: "/commercial-real-estate-salary-guide", label: "CRE Salary Guide" },
+  { href: "/cre-interview-questions", label: "CRE Interview Questions" },
+  { href: "/acquisitions-analyst-real-estate", label: "Acquisitions Analyst Guide" },
+];
+
+const LEGAL_LINKS: FooterLink[] = [
+  { href: "/about", label: "About" },
+  { href: "/contact", label: "Contact" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+];
+
+function LinkList({ links }: { links: FooterLink[] }) {
+  return (
+    <ul className="mt-3 space-y-2 text-sm">
+      {links.map((l) => (
+        <li key={l.href}>
+          <Link
+            className="text-slate-600 hover:text-slate-900 hover:underline"
+            href={l.href}
+          >
+            {l.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function SiteFooter() {
   return (
     <footer className="border-t border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2">
-        {/* LEFT: Brand + contact */}
-        <div>
-          <div className="text-base font-extrabold tracking-tight">HireCRE</div>
-          <p className="mt-2 text-sm text-slate-600">
-            A clean feed of commercial real estate roles aggregated from public job
-            boards (starting with Greenhouse).
-          </p>
-          <p className="mt-3 text-sm text-slate-600">
-            Contact:{" "}
-            <a
-              className="font-medium text-slate-900 hover:underline"
-              href="mailto:hirecre@a26cos.com"
-            >
-              hirecre@a26cos.com
-            </a>
-          </p>
-          <p className="mt-4 text-xs text-slate-500">
-            © {new Date().getFullYear()} HireCRE
-          </p>
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Brand */}
+          <div>
+            <div className="text-base font-extrabold tracking-tight">HireCRE</div>
+            <p className="mt-2 text-sm text-slate-600">
+              A curated commercial real estate job board, plus interview prep and
+              underwriting resources for CRE professionals.
+            </p>
+            <p className="mt-3 text-sm text-slate-600">
+              Contact:{" "}
+              <a
+                className="font-medium text-slate-900 hover:underline"
+                href="mailto:hirecre@a26cos.com"
+              >
+                hirecre@a26cos.com
+              </a>
+            </p>
+          </div>
+
+          {/* Product */}
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Product</div>
+            <LinkList links={PRODUCT_LINKS} />
+          </div>
+
+          {/* Guides */}
+          <div>
+            <div className="text-sm font-semibold text-slate-900">CRE Guides</div>
+            <LinkList links={GUIDE_LINKS} />
+          </div>
+
+          {/* Company */}
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Company</div>
+            <LinkList links={LEGAL_LINKS} />
+          </div>
         </div>
 
-        {/* RIGHT: Pages */}
-        <div className="sm:text-right">
-          <div className="text-sm font-semibold text-slate-900">Pages</div>
-          <ul className="mt-3 space-y-2 text-sm sm:ml-auto sm:inline-block">
-            <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/">
-                Home
-              </Link>
-            </li>
-            <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/board">
-                Jobs
-              </Link>
-            </li>
-            <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/about">
-                About
-              </Link>
-            </li>
-            <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/contact">
-                Contact
-              </Link>
-            </li>
-            <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/privacy">
-                Privacy
-              </Link>
-            </li>
-            <li>
-              <Link className="text-slate-600 hover:text-slate-900 hover:underline" href="/terms">
-                Terms
-              </Link>
-            </li>
-          </ul>
+        <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center">
+          <div>© {new Date().getFullYear()} HireCRE. All rights reserved.</div>
         </div>
       </div>
     </footer>
