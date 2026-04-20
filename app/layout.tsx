@@ -4,6 +4,7 @@ import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
 import Script from "next/script";
 import Analytics from "@/components/analytics";
+import CookieConsent from "@/components/CookieConsent";
 import { Inter } from "next/font/google";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="container py-10">{children}</main>
 
         <SiteFooter />
+        <CookieConsent />
       </body>
     </html>
   );
