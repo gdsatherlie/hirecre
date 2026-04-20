@@ -1,6 +1,7 @@
 export const metadata = {
   title: "Contact | HireCRE",
   description: "Contact HireCRE for corrections, submissions, or partnerships.",
+  alternates: { canonical: "/contact" },
 };
 
 export default function ContactPage() {

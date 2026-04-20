@@ -4,6 +4,7 @@ export const metadata = {
   title: "Commercial Real Estate Career Guide | HireCRE",
   description:
     "A practical CRE career guide that maps roles to the capital stack and deal cycle so you can choose the right seat.",
+  alternates: { canonical: "/commercial-real-estate-career-guide" },
 };
 
 const toc = [

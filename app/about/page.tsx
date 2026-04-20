@@ -1,6 +1,7 @@
 export const metadata = {
   title: "About | HireCRE",
   description: "A simple, curated job board for commercial real estate and proptech.",
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {

@@ -4,6 +4,7 @@ export const metadata = {
   title: "CRE Interview Questions Guide | HireCRE",
   description:
     "Prepare for CRE interviews by linking numbers to decisions, like writing a concise investment memo.",
+  alternates: { canonical: "/cre-interview-questions" },
 };
 
 const sections = [

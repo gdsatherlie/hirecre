@@ -4,6 +4,7 @@ export const metadata = {
   title: "Acquisitions Analyst Real Estate Guide | HireCRE",
   description:
     "Learn what acquisitions analysts actually do: underwriting, judgment, and investment storytelling.",
+  alternates: { canonical: "/acquisitions-analyst-real-estate" },
 };
 
 const toc = [

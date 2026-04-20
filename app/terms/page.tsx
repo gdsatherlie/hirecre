@@ -1,6 +1,7 @@
 export const metadata = {
   title: "Terms | HireCRE",
   description: "HireCRE terms of service.",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {

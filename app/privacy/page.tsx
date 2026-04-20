@@ -1,6 +1,7 @@
 export const metadata = {
   title: "Privacy | HireCRE",
   description: "HireCRE privacy policy.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

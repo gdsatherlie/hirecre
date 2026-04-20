@@ -2,6 +2,7 @@ export const metadata = {
   title: "Interview Prep | HireCRE",
   description:
     "Commercial real estate interview prep across debt, equity, acquisitions, asset management, development, leasing, brokerage, and property operations.",
+  alternates: { canonical: "/interview-prep" },
 };
 
 type PrepCard = {

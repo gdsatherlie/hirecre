@@ -94,6 +94,102 @@ function safePay(job: Job) {
   return p;
 }
 
+// Detect whether a role is remote based on the location fields.
+function detectRemote(job: Job): boolean {
+  const hay = `${job.location_raw ?? ""} ${job.location_city ?? ""} ${job.location_state ?? ""}`.toLowerCase();
+  return /\bremote\b|\bwork from home\b|\bwfh\b|\btelecommut/.test(hay);
+}
+
+// Guess an employment type from the job title. Defaults to FULL_TIME.
+// Returns the Schema.org-valid enum value.
+function guessEmploymentType(title: string): string {
+  const t = title.toLowerCase();
+  if (/\bintern(ship)?\b/.test(t)) return "INTERN";
+  if (/\bpart[-\s]?time\b/.test(t)) return "PART_TIME";
+  if (/\btemporary\b|\btemp\b/.test(t)) return "TEMPORARY";
+  if (/\bcontract(or|ing)?\b|\bcontract to hire\b|\bfreelanc/.test(t)) return "CONTRACTOR";
+  if (/\bvolunteer\b/.test(t)) return "VOLUNTEER";
+  return "FULL_TIME";
+}
+
+// Parse a free-text pay string into a Schema.org baseSalary object.
+// Handles common patterns like:
+//   "$100,000 - $120,000 / year"
+//   "$100k-$120k"
+//   "$80,000 per year"
+//   "$50/hour"
+function parseBaseSalary(pay: string):
+  | {
+      "@type": "MonetaryAmount";
+      currency: string;
+      value: {
+        "@type": "QuantitativeValue";
+        unitText: "HOUR" | "YEAR";
+        minValue?: number;
+        maxValue?: number;
+        value?: number;
+      };
+    }
+  | null {
+  if (!pay) return null;
+  const s = String(pay).replace(/\s+/g, " ").trim();
+
+  // Expand "k" shorthand (e.g. "$120k" -> "$120000").
+  const expanded = s.replace(
+    /\$\s*([\d,.]+)\s*k\b/gi,
+    (_m, num: string) => `$${Math.round(parseFloat(num.replace(/,/g, "")) * 1000)}`
+  );
+
+  const rangeMatch = expanded.match(
+    /\$\s*([\d,]+(?:\.\d+)?)\s*(?:-|–|to)\s*\$?\s*([\d,]+(?:\.\d+)?)/
+  );
+  const singleMatch = expanded.match(/\$\s*([\d,]+(?:\.\d+)?)/);
+
+  let minValue: number | undefined;
+  let maxValue: number | undefined;
+  let value: number | undefined;
+
+  if (rangeMatch) {
+    minValue = Number(rangeMatch[1].replace(/,/g, ""));
+    maxValue = Number(rangeMatch[2].replace(/,/g, ""));
+    if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) return null;
+  } else if (singleMatch) {
+    value = Number(singleMatch[1].replace(/,/g, ""));
+    if (!Number.isFinite(value)) return null;
+  } else {
+    return null;
+  }
+
+  const unitText: "HOUR" | "YEAR" =
+    /\/\s*h(?:r|our)|\bper\s+hour\b|\bhr\b/i.test(expanded) ? "HOUR" : "YEAR";
+
+  // Sanity check: reject absurd values that might be parsing artifacts.
+  const candidate = value ?? maxValue ?? minValue ?? 0;
+  if (unitText === "HOUR" && (candidate < 5 || candidate > 1000)) return null;
+  if (unitText === "YEAR" && (candidate < 10_000 || candidate > 10_000_000)) return null;
+
+  return {
+    "@type": "MonetaryAmount",
+    currency: "USD",
+    value: {
+      "@type": "QuantitativeValue",
+      unitText,
+      ...(minValue !== undefined ? { minValue } : {}),
+      ...(maxValue !== undefined ? { maxValue } : {}),
+      ...(value !== undefined ? { value } : {}),
+    },
+  };
+}
+
+// Pick a reasonable expiration date for the JobPosting JSON-LD. We keep
+// active listings fresh for 30 days past the most recent sighting.
+function computeValidThrough(job: Job): string {
+  const base = job.last_seen_at || job.posted_at;
+  const anchor = base ? new Date(base) : new Date();
+  const expires = new Date(anchor.getTime() + 30 * 24 * 60 * 60 * 1000);
+  return expires.toISOString();
+}
+
 // Only index active jobs with enough substance
 function shouldIndex(job: Job, descText: string) {
   if (!job.is_active) return false;
@@ -308,26 +404,65 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
 
   const snapshot = buildSnapshot(descText);
 
-  const jsonLd = {
+  const isRemote = detectRemote(job);
+  const employmentType = guessEmploymentType(title);
+  const validThrough = computeValidThrough(job);
+  const baseSalary = pay ? parseBaseSalary(pay) : null;
+
+  const jsonLd: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
     title,
-    hiringOrganization: { "@type": "Organization", name: company },
-    datePosted: job.posted_at ? new Date(job.posted_at).toISOString() : undefined,
-    jobLocation: location
-      ? {
-          "@type": "Place",
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: job.location_city || undefined,
-            addressRegion: job.location_state || undefined,
-          },
-        }
-      : undefined,
     description: descText.slice(0, 5000),
-    url: job.url || undefined,
-    directApply: true,
+    datePosted: job.posted_at ? new Date(job.posted_at).toISOString() : undefined,
+    validThrough,
+    employmentType,
+    hiringOrganization: { "@type": "Organization", name: company },
+    identifier: {
+      "@type": "PropertyValue",
+      name: "HireCRE",
+      value: job.slug,
+    },
+    // HireCRE links out to the employer's ATS; set false per Google spec.
+    directApply: false,
+    url: `${SITE_URL}/jobs/${job.slug}`,
   };
+
+  if (isRemote) {
+    // Schema.org: for remote-only postings use jobLocationType +
+    // applicantLocationRequirements (Google's requirement).
+    jsonLd.jobLocationType = "TELECOMMUTE";
+    jsonLd.applicantLocationRequirements = {
+      "@type": "Country",
+      name: "US",
+    };
+  }
+
+  // Always include a jobLocation when we have any physical location info,
+  // even for remote-plus-office hybrids.
+  if (job.location_city || job.location_state || job.location_raw) {
+    jsonLd.jobLocation = {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        ...(job.location_city ? { addressLocality: job.location_city } : {}),
+        ...(job.location_state ? { addressRegion: job.location_state } : {}),
+        addressCountry: "US",
+      },
+    };
+  } else if (!isRemote) {
+    // No physical info AND not remote: Google treats this as invalid.
+    // Fall back to a country-level location so at least the required
+    // field is present and the posting is eligible for indexing.
+    jsonLd.jobLocation = {
+      "@type": "Place",
+      address: { "@type": "PostalAddress", addressCountry: "US" },
+    };
+  }
+
+  if (baseSalary) {
+    jsonLd.baseSalary = baseSalary;
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">

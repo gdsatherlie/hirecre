@@ -4,6 +4,7 @@ export const metadata = {
   title: "Commercial Real Estate Salary Guide | HireCRE",
   description:
     "Understand CRE compensation by role, risk, and platform so you can negotiate with context.",
+  alternates: { canonical: "/commercial-real-estate-salary-guide" },
 };
 
 const toc = [

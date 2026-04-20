@@ -4,6 +4,7 @@ export const metadata = {
   title: "Resources | HireCRE",
   description:
     "Commercial real estate books, technical tools, certifications, research, and career resources.",
+  alternates: { canonical: "/resources" },
 };
 
 type Resource = {
