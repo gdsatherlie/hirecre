@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-echo "Running Greenhouse sync..."
-node scripts/sync-greenhouse.mjs || echo "Greenhouse sync failed (continuing)"
+# Greenhouse sync is handled by a dedicated Coolify scheduled task
+# (every 6h). Running it here on container boot was redundant and
+# re-ran the scrape on every redeploy.
 
-echo "Starting Next.js..."
-npm start
+exec npm start
