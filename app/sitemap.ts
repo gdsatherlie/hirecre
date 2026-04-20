@@ -23,6 +23,8 @@ const STATIC_ROUTES: Array<{
   { path: "/jobs/in", priority: 0.8, changeFrequency: "daily" },
   { path: "/interview-prep", priority: 0.9, changeFrequency: "weekly" },
   { path: "/blog", priority: 0.8, changeFrequency: "weekly" },
+  { path: "/tools", priority: 0.7, changeFrequency: "monthly" },
+  { path: "/tools/salary-calculator", priority: 0.9, changeFrequency: "monthly" },
   { path: "/resources", priority: 0.7, changeFrequency: "weekly" },
   { path: "/commercial-real-estate-career-guide", priority: 0.8, changeFrequency: "monthly" },
   { path: "/commercial-real-estate-salary-guide", priority: 0.8, changeFrequency: "monthly" },
