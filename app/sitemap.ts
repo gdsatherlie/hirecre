@@ -6,6 +6,7 @@
 import type { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { US_STATES } from "@/lib/us-states";
+import { getAllBlogPosts } from "@/lib/blog-posts";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://hirecre.com";
 
@@ -21,6 +22,7 @@ const STATIC_ROUTES: Array<{
   { path: "/board", priority: 0.9, changeFrequency: "hourly" },
   { path: "/jobs/in", priority: 0.8, changeFrequency: "daily" },
   { path: "/interview-prep", priority: 0.9, changeFrequency: "weekly" },
+  { path: "/blog", priority: 0.8, changeFrequency: "weekly" },
   { path: "/resources", priority: 0.7, changeFrequency: "weekly" },
   { path: "/commercial-real-estate-career-guide", priority: 0.8, changeFrequency: "monthly" },
   { path: "/commercial-real-estate-salary-guide", priority: 0.8, changeFrequency: "monthly" },
@@ -113,5 +115,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...staticEntries, ...prepEntries, ...stateEntries];
+  const blogEntries: MetadataRoute.Sitemap = getAllBlogPosts().map((p) => ({
+    url: `${SITE_URL}/blog/${p.slug}`,
+    lastModified: new Date(p.publishedAt),
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
+  }));
+
+  return [...staticEntries, ...prepEntries, ...stateEntries, ...blogEntries];
 }

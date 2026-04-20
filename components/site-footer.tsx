@@ -6,6 +6,7 @@ const PRODUCT_LINKS: FooterLink[] = [
   { href: "/", label: "Home" },
   { href: "/board", label: "Jobs" },
   { href: "/interview-prep", label: "Interview Prep" },
+  { href: "/blog", label: "Blog" },
   { href: "/alerts", label: "Job Alerts" },
   { href: "/resources", label: "Resources" },
 ];
