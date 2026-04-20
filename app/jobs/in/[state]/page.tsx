@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getStateBySlug, US_STATES } from "@/lib/us-states";
+import { getStateMarket } from "@/lib/state-market-content";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://hirecre.com";
 const JOBS_PER_PAGE = 50;
@@ -102,6 +103,17 @@ export default async function StateJobsPage({
 
   const jobs = await getJobsForState(s.abbrev, s.name);
   const indexable = jobs.length >= MIN_JOBS_TO_INDEX;
+  const market = getStateMarket(s.abbrev);
+
+  // Top employers with active roles in this state — derived from jobs.
+  const employerCounts = new Map<string, number>();
+  for (const j of jobs) {
+    if (!j.company) continue;
+    employerCounts.set(j.company, (employerCounts.get(j.company) ?? 0) + 1);
+  }
+  const topEmployers = Array.from(employerCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
 
   const breadcrumbLd = {
     "@context": "https://schema.org",
@@ -154,7 +166,7 @@ export default async function StateJobsPage({
           </h1>
           <p className="mt-3 max-w-3xl text-base text-gray-600">
             {jobs.length > 0
-              ? `${jobs.length} active commercial real estate and proptech role${jobs.length === 1 ? "" : "s"} in ${s.name}, aggregated from company career sites.`
+              ? `${jobs.length} active commercial real estate and proptech role${jobs.length === 1 ? "" : "s"} in ${s.name}${market ? ` — ${market.tagline}` : ""}.`
               : `We don't currently have active CRE roles listed in ${s.name}. Check back as new roles are added every few hours.`}
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
@@ -172,6 +184,156 @@ export default async function StateJobsPage({
             </Link>
           </div>
         </header>
+
+        {/* Market overview — only for curated states. Provides unique,
+            editorial content above the scraped job list, which is
+            what AdSense / Google reward on an aggregator site. */}
+        {market ? (
+          <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {s.name} CRE market overview
+            </h2>
+            <div className="mt-3 space-y-3 text-sm leading-6 text-gray-700">
+              {market.overview.map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+            </div>
+
+            <div className="mt-6 grid gap-6 sm:grid-cols-2">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Key metros
+                </h3>
+                <ul className="mt-2 flex flex-wrap gap-2 text-xs">
+                  {market.keyMetros.map((m) => (
+                    <li
+                      key={m}
+                      className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-gray-700"
+                    >
+                      {m}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Employer types active here
+                </h3>
+                <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                  {market.employerSegments.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Compensation context
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-gray-700">
+                {market.compensationNote}
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Common {s.name} CRE roles
+              </h3>
+              <ul className="mt-2 flex flex-wrap gap-2 text-xs">
+                {market.commonRoles.map((r) => (
+                  <li
+                    key={r}
+                    className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-800"
+                  >
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        ) : null}
+
+        {/* Top employers in this state (data-driven). */}
+        {topEmployers.length > 0 ? (
+          <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Top CRE employers hiring in {s.name}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Companies with the most active listings on HireCRE right now.
+            </p>
+            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+              {topEmployers.map(([name, count]) => (
+                <li
+                  key={name}
+                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm"
+                >
+                  <span className="font-semibold text-gray-900">{name}</span>
+                  <span className="text-xs text-gray-500">
+                    {count} {count === 1 ? "role" : "roles"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {/* Interview prep tie-in — drives users into the editorial
+            content hub and adds SEO-friendly internal linking. */}
+        <section className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Prepping for a CRE interview in {s.name}?
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Our interview prep hub covers the concepts that come up repeatedly
+            in CRE debt, equity, and acquisitions interviews — including the
+            ones most often tested at the institutional seats above.
+          </p>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2 text-sm">
+            <li>
+              <Link
+                href="/interview-prep/dscr-vs-debt-yield"
+                className="text-blue-700 hover:underline"
+              >
+                DSCR vs Debt Yield (with example)
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/interview-prep/cap-rate-explained"
+                className="text-blue-700 hover:underline"
+              >
+                Cap Rate Explained (with example)
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/interview-prep/equity-waterfall-basics"
+                className="text-blue-700 hover:underline"
+              >
+                Equity Waterfall Basics
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/interview-prep/underwriting-walkthrough"
+                className="text-blue-700 hover:underline"
+              >
+                Walk Me Through Your Underwriting
+              </Link>
+            </li>
+          </ul>
+          <div className="mt-4">
+            <Link
+              href="/interview-prep"
+              className="text-sm font-semibold text-blue-700 hover:underline"
+            >
+              View the full Interview Prep hub →
+            </Link>
+          </div>
+        </section>
 
         {!indexable ? (
           <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
