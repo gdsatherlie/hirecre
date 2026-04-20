@@ -1,5 +1,5 @@
 // app/jobs/[slug]/page.tsx
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -31,11 +31,9 @@ type Job = {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://hirecre.com";
 
-function supaAdmin() {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(url, key, { auth: { persistSession: false } });
-}
+// Back-compat alias: the existing code uses supaAdmin() as a factory;
+// keep it callable but route through the shared singleton.
+const supaAdmin = supabaseAdmin;
 
 function decodeEntities(s: string) {
   return String(s || "")

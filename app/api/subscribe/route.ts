@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 function isValidEmail(email: string) {
   return /^\S+@\S+\.\S+$/.test(email);
@@ -19,20 +19,8 @@ export async function POST(req: Request) {
     }
 
     // ---- 1) Save to Supabase (your current system of record) ----
-    const supabaseUrl = process.env.SUPABASE_URL!;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        { error: "Server misconfigured: missing Supabase env vars." },
-        { status: 500 }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
     // If you have a unique constraint on email, this will upsert cleanly.
-    const { error: dbErr } = await supabase
+    const { error: dbErr } = await supabaseAdmin()
       .from("newsletter_subscribers")
       .upsert(
         { email, source },

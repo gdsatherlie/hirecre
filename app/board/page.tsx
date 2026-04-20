@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import EmailSignup from "@/components/EmailSignup";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
 
 /**
  * app/board/page.tsx (PRODUCTION-SAFE)
@@ -44,11 +44,6 @@ type Job = {
   has_pay: boolean | null;
   pay_extracted: string | null;
 };
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 // Optional display overrides
 const COMPANY_OVERRIDES: Record<string, string> = {
