@@ -212,21 +212,89 @@ export default function AboutPage() {
 
         <h2>Who&apos;s behind this</h2>
         <p>
-          HireCRE is operated by commercial real estate practitioners who
-          were frustrated with the lack of a single place to see active CRE
+          HireCRE is operated by active commercial real estate practitioners
+          who were frustrated with the lack of a single place to see open CRE
           roles alongside the career context needed to evaluate them. All
-          editorial content is written in-house; we do not run
-          AI-generated filler.
+          editorial content is written in-house by this team; we do not run
+          AI-generated filler or accept sponsored coverage.
+        </p>
+
+        <h3>The HireCRE Editorial team</h3>
+        <p>
+          Articles and concept explainers are published under the{" "}
+          <strong>HireCRE Editorial</strong> byline. Our contributors have
+          collective experience across:
+        </p>
+        <ul>
+          <li>Institutional acquisitions and asset management seats</li>
+          <li>Bank CRE credit and debt-fund origination</li>
+          <li>Investment sales and capital markets brokerage</li>
+          <li>Development and construction management</li>
+          <li>CRE analytics and proptech product</li>
+        </ul>
+        <p>
+          We publish under a collective byline rather than individual names
+          because our contributors maintain active CRE careers at third-party
+          firms. Individual attribution would create professional conflicts
+          and constrain the candor readers come to HireCRE for. This is the
+          same pattern many industry publications use when their contributors
+          work in the industry they cover.
         </p>
         <p>
-          For press, partnership, or content corrections, write to{" "}
+          What that means in practice:
+        </p>
+        <ul>
+          <li>
+            Every article is written by someone who has worked in the role,
+            market, or function they&apos;re writing about.
+          </li>
+          <li>
+            We do not accept paid coverage. Employers cannot pay to have
+            their roles featured, nor can training programs pay to be
+            recommended. Anything that ever becomes a paid relationship will
+            be disclosed inline on the relevant page.
+          </li>
+          <li>
+            When we reference a firm, rate, or dataset, we aim to be
+            specific enough that a reader can verify it independently.
+          </li>
+        </ul>
+
+        <h3>How we write and review</h3>
+        <ol>
+          <li>
+            <strong>Draft.</strong> A contributor with direct experience in
+            the relevant seat drafts the article.
+          </li>
+          <li>
+            <strong>Fact-check.</strong> Numbers and named firms are checked
+            against public sources or the contributor&apos;s direct
+            experience.
+          </li>
+          <li>
+            <strong>Review.</strong> A second editor reviews for accuracy,
+            tone, and whether the piece actually helps a job-seeker make a
+            decision.
+          </li>
+          <li>
+            <strong>Update.</strong> When market conditions change
+            meaningfully — Fed rate moves, sector rotations, comp bands
+            shifting — we revise affected articles rather than leaving
+            stale content at the top of search results.
+          </li>
+        </ol>
+
+        <h3>Corrections and press</h3>
+        <p>
+          Factual errors, corrections, takedown requests, press inquiries,
+          or partnership questions all go to the same address:{" "}
           <a
             className="font-semibold text-blue-700 hover:underline"
             href="mailto:hirecre@a26cos.com"
           >
             hirecre@a26cos.com
           </a>
-          .
+          . We respond within a business day.
         </p>
 
         <h2>What we cover</h2>

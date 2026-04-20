@@ -94,6 +94,24 @@ export default function BlogPostLayout({
             {post.title}
           </h1>
           <p className="mt-3 text-base text-gray-600">{post.description}</p>
+          <p className="mt-3 text-xs text-gray-500">
+            By{" "}
+            <Link
+              href="/about"
+              className="font-semibold text-gray-700 hover:underline"
+            >
+              HireCRE Editorial
+            </Link>{" "}
+            — active CRE practitioners writing under a collective byline
+            to preserve independence. See our{" "}
+            <Link
+              href="/about"
+              className="font-semibold text-gray-700 hover:underline"
+            >
+              editorial standards
+            </Link>
+            .
+          </p>
         </header>
 
         <div className="prose prose-neutral max-w-none prose-headings:tracking-tight prose-h2:mt-10 prose-h2:text-xl prose-h2:font-semibold prose-h3:mt-6 prose-h3:text-lg prose-h3:font-semibold prose-a:text-blue-700 prose-a:font-semibold prose-a:no-underline hover:prose-a:underline">
